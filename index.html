@@ -556,20 +556,6 @@
             white-space: nowrap;
         }
 
-        /* Cloud Badge for External DBs */
-        .cloud-badge {
-            position: absolute;
-            bottom: -2px;
-            right: -8px;
-            color: #00d2ff;
-            font-size: 24px;
-            filter: drop-shadow(0 0 8px #00d2ff);
-            background: var(--bg-russian);
-            border-radius: 50%;
-            padding: 2px;
-            z-index: 2;
-        }
-
         /* ----- NODE TITLE & FOLDER BADGE ----- */
         .node-title {
             font-family: var(--font-header);
@@ -1080,7 +1066,7 @@
             currentProject: 'Untitled',
             nodes: {},
             edges: [],
-            structuralEdges: [], // Separates asset loads from logic flow to prevent false cyclic alerts
+            structuralEdges: [], // NEW: Separates asset loads from logic flow to prevent false cyclic alerts
             inferredPaths: {},
             pan: { x: 0, y: 0 },
             zoom: 1,
@@ -1098,11 +1084,7 @@
         window.OccamsAPI = {
             state: state,
             hooks: {
-                afterEdgesDrawn: [],
-                onFileParse: [] // NEW: Middleware hook to allow plugins to scan raw file content before matrix generation
-            },
-            addNode: function(id, type, iconText, vars, deps, dirPath) { 
-                addNodeData(id, type, iconText, vars, deps, dirPath); 
+                afterEdgesDrawn: []
             },
             showToast: function(msg) { showToast(msg); }
         };
@@ -1110,8 +1092,7 @@
         // --- CENTRALIZED PLUGIN DIRECTORY ---
         // Simply add your extension URLs or local paths to this array.
         const PLUGINS = [
-            'https://raw.githubusercontent.com/F-O-R-G-E-Open-Source-Philanthropy/ocamms-web/refs/heads/main/plugins/cyclic-alerts.js',
-            'plugins/cloud-db-detector.js' // Placeholder for the new Cloud Database Extension
+            'https://raw.githubusercontent.com/F-O-R-G-E-Open-Source-Philanthropy/ocamms-web/refs/heads/main/plugins/cyclic-alerts.js'
         ];
 
         async function loadPlugins() {
@@ -1137,7 +1118,7 @@
                     document.body.appendChild(script);
                 } catch (error) {
                     console.warn(`Failed to load plugin: ${path}`, error);
-                    // Silent fail for placeholders
+                    showToast(`❌ Plugin Blocked or Missing: ${path.split('/').pop()}`);
                 }
             }
         }
@@ -1547,13 +1528,8 @@
                 if (!state.nodes[genericId]) addNodeData(genericId, 'db', '', [], [], '');
             }
 
-            // --- TRIGGER PLUGIN PARSER HOOKS ---
-            window.OccamsAPI.hooks.onFileParse.forEach(fn => {
-                fn({ fileName, ext, content, deps, vars, dirPath });
-            });
-
             if (deps.length === 0 && Object.keys(state.nodes).length > 0) {
-                const keys = Object.keys(state.nodes).filter(k => state.nodes[k].type !== 'db' && state.nodes[k].type !== 'db-cloud');
+                const keys = Object.keys(state.nodes).filter(k => state.nodes[k].type !== 'db');
                 if (keys.length > 0) {
                     deps.push({ target: keys[Math.floor(Math.random() * keys.length)], isStructural: true });
                 }
@@ -1610,18 +1586,12 @@
             elNode.style.left = `${n.x}px`;
             elNode.style.top = `${n.y}px`;
 
-            if (n.type === 'db' || n.type === 'db-cloud') {
+            if (n.type === 'db') {
                 elNode.className = 'node db-node';
                 elNode.setAttribute('data-type', n.type);
                 elNode.onmousedown = (e) => startNodeDrag(e, n.id);
-                
-                const cloudBadgeHtml = n.type === 'db-cloud' ? `<i class="fa-solid fa-cloud cloud-badge"></i>` : '';
-                
                 elNode.innerHTML = `
-                    <div style="position:relative; display:inline-block;">
-                        <i class="fa-solid fa-database db-icon"></i>
-                        ${cloudBadgeHtml}
-                    </div>
+                    <i class="fa-solid fa-database db-icon"></i>
                     <div class="db-title">${n.id}</div>
                 `;
                 return elNode;
@@ -1669,7 +1639,7 @@
         window.toggleNode = function(id, event) {
             if (event) event.stopPropagation();
             const node = state.nodes[id];
-            if (!node || node.type === 'db' || node.type === 'db-cloud') return;
+            if (!node || node.type === 'db') return;
             node.expanded = !node.expanded;
             const elNode = document.getElementById(`node-${id}`);
             if (elNode) elNode.classList.toggle('expanded', node.expanded);
@@ -1780,7 +1750,7 @@
         function cleanupOrphanedDBs() {
             Object.keys(state.nodes).forEach(id => {
                 const node = state.nodes[id];
-                if (node.type === 'db' || node.type === 'db-cloud') {
+                if (node.type === 'db') {
                     const hasConnection = state.edges.some(e => e.source === id || e.target === id) || 
                                           state.structuralEdges.some(e => e.source === id || e.target === id);
                     if (!hasConnection) {
@@ -1877,7 +1847,7 @@
             // 1. Group nodes by directory path
             const dirs = {};
             Object.values(state.nodes).forEach(n => {
-                if (n.dirPath && n.type !== 'db' && n.type !== 'db-cloud') {
+                if (n.dirPath && n.type !== 'db') {
                     const parts = n.dirPath.split('/');
                     let current = '';
                     parts.forEach(part => {
@@ -2151,7 +2121,7 @@
 
             Object.keys(state.nodes).forEach(key => {
                 const n = state.nodes[key];
-                if (n.type !== 'db' && n.type !== 'db-cloud') {
+                if (n.type !== 'db') {
                     const size = 1024;
                     addFileToTray(n.id, n.iconText || 'Js', size);
                 }
