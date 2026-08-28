@@ -696,6 +696,17 @@
             filter: drop-shadow(0 0 4px var(--text-ruby));
         }
 
+        /* --- STRUCTURAL EDGES (Asset loads, Electron bridging, safe config) --- */
+        .edge-line.structural {
+            stroke: rgba(0, 210, 255, 0.3);
+            stroke-dasharray: 6 6;
+        }
+        .edge-packet.structural {
+            stroke: #00d2ff;
+            filter: drop-shadow(0 0 5px #00d2ff);
+            opacity: 0.85;
+        }
+
         @keyframes data-flow {
             from {
                 stroke-dashoffset: 24;
@@ -703,6 +714,17 @@
             to {
                 stroke-dashoffset: 0;
             }
+        }
+
+        /* --- PLUGIN STYLES --- */
+        .edge-glow.cycle-warning {
+            stroke: #ff0000;
+            filter: drop-shadow(0 0 8px #ff0000);
+            opacity: 0.6;
+        }
+        .edge-packet.cycle-warning {
+            stroke: #ff0000;
+            filter: drop-shadow(0 0 6px #ff0000);
         }
 
         /* ----- TOASTS ----- */
@@ -901,7 +923,16 @@
     <main id="workspace">
         <div id="canvas">
             <div id="folders"></div>
-            <svg id="edges"></svg>
+            <svg id="edges">
+                <defs>
+                    <marker id="arrowhead" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+                        <polygon points="0 0, 6 3, 0 6" fill="var(--text-ruby)" />
+                    </marker>
+                    <marker id="arrowhead-cycle" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+                        <polygon points="0 0, 6 3, 0 6" fill="#ff0000" />
+                    </marker>
+                </defs>
+            </svg>
             <div id="nodes"></div>
         </div>
         <div class="notification-area" id="notif-area"></div>
@@ -1035,6 +1066,7 @@
             currentProject: 'Untitled',
             nodes: {},
             edges: [],
+            structuralEdges: [], // NEW: Separates asset loads from logic flow to prevent false cyclic alerts
             inferredPaths: {},
             pan: { x: 0, y: 0 },
             zoom: 1,
@@ -1045,6 +1077,51 @@
             pickMode: 'files',
             processedFiles: new Set()
         };
+
+        // ================================================================
+        //  PLUGIN API & LOADER
+        // ================================================================
+        window.OccamsAPI = {
+            state: state,
+            hooks: {
+                afterEdgesDrawn: []
+            },
+            showToast: function(msg) { showToast(msg); }
+        };
+
+        // --- CENTRALIZED PLUGIN DIRECTORY ---
+        // Simply add your extension URLs or local paths to this array.
+        const PLUGINS = [
+            'https://raw.githubusercontent.com/F-O-R-G-E-Open-Source-Philanthropy/ocamms-web/refs/heads/main/plugins/cyclic-alerts.js'
+        ];
+
+        async function loadPlugins() {
+            for (let path of PLUGINS) {
+                try {
+                    // 1. Fetch the raw code (bypasses standard script-tag blocking)
+                    const response = await fetch(path);
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    const code = await response.text();
+                    
+                    // 2. Convert to a local Blob to bypass strict Content Security Policies (CSP)
+                    const blob = new Blob([code], { type: 'application/javascript' });
+                    const blobUrl = URL.createObjectURL(blob);
+                    
+                    // 3. Inject the local blob URL securely
+                    const script = document.createElement('script');
+                    script.src = blobUrl;
+                    script.onload = () => {
+                        URL.revokeObjectURL(blobUrl); // Memory cleanup
+                        const pluginName = path.split('/').pop();
+                        showToast(`🔌 Plugin Active: ${pluginName}`);
+                    };
+                    document.body.appendChild(script);
+                } catch (error) {
+                    console.warn(`Failed to load plugin: ${path}`, error);
+                    showToast(`❌ Plugin Blocked or Missing: ${path.split('/').pop()}`);
+                }
+            }
+        }
 
         // ================================================================
         //  DOM REFS
@@ -1262,117 +1339,97 @@
         //  ENHANCED PARSER — supports many languages and import patterns
         // ================================================================
         function extractDependencies(content, fileExt) {
-            const deps = [];
+            const deps = new Map(); // Use Map to prevent duplicates and handle upgrades
+
+            // Helper to add dependencies and flag them intelligently
+            const addDep = (depString, isStructural) => {
+                let norm = depString.replace(/\\/g, '/').replace(/^\.\.?\//, '');
+                const parts = norm.split('/');
+                const depFile = parts.pop();
+
+                // Only keep valid file names
+                if (depFile && depFile.includes('.') && depFile.length > 2) {
+                    if (deps.has(depFile)) {
+                        // If we previously marked this as a loose structural load, 
+                        // but later find a strict hard import, upgrade its status to false (Logic plane)
+                        if (!isStructural && deps.get(depFile).isStructural) {
+                            deps.get(depFile).isStructural = false;
+                        }
+                    } else {
+                        deps.set(depFile, { file: depFile, isStructural, parts });
+                    }
+                }
+            };
+
             const lang = langTypes[fileExt] || 'js';
 
-            // Common patterns: import, require, include, using, from
-            const patterns = [];
-
-            // JavaScript / TypeScript
+            // --- 1. HARD PATTERNS (Logic Plane: Can cause infinite execution cycles) ---
+            const hardPatterns = [];
             if (lang === 'js' || lang === 'ts') {
-                // import ... from 'path'
-                patterns.push(/import\s*\{[^}]*\}\s*from\s*['"`]([^'"`]+)['"`]/g);
-                patterns.push(/import\s*[\w\s,]+\s*from\s*['"`]([^'"`]+)['"`]/g);
-                patterns.push(/import\s*['"`]([^'"`]+)['"`]/g);
-                // import('path')
-                patterns.push(/import\(\s*['"`]([^'"`]+)['"`]\s*\)/g);
-                // require('path')
-                patterns.push(/require\(\s*['"`]([^'"`]+)['"`]\s*\)/g);
-                // require("path")
-                patterns.push(/require\(\s*["]([^"]+)["]\s*\)/g);
-            }
-            // C# / C++ / C
-            else if (lang === 'cs' || lang === 'cpp') {
-                // #include "path" or #include <path>
-                patterns.push(/#include\s*["<]([^">]+)[">]/g);
-                // using ... ; (C#)
-                patterns.push(/using\s+([\w\.]+);/g);
-            }
-            // Python
-            else if (lang === 'py') {
-                // import module
-                patterns.push(/import\s+([\w\.]+)/g);
-                // from module import ...
-                patterns.push(/from\s+([\w\.]+)\s+import/g);
-            }
-            // Ruby
-            else if (lang === 'rb') {
-                // require 'path'
-                patterns.push(/require\s+['"]([^'"]+)['"]/g);
-                // require_relative 'path'
-                patterns.push(/require_relative\s+['"]([^'"]+)['"]/g);
-            }
-            // PHP
-            else if (lang === 'php') {
-                // require 'path'
-                patterns.push(/require\s+['"]([^'"]+)['"]/g);
-                patterns.push(/require\s+["]([^"]+)["]/g);
-                // include 'path'
-                patterns.push(/include\s+['"]([^'"]+)['"]/g);
-                patterns.push(/include\s+["]([^"]+)["]/g);
-                // use namespace
-                patterns.push(/use\s+([\w\\]+)/g);
-            }
-            // Go
-            else if (lang === 'go') {
-                // import "path"
-                patterns.push(/import\s+["]([^"]+)["]/g);
-                // import (
-                //   "path"
-                // )
-                patterns.push(/import\s*\(\s*["]([^"]+)["]/g);
-            }
-            // Rust
-            else if (lang === 'rs') {
-                // use crate::path
-                patterns.push(/use\s+([\w:]+)/g);
-                // extern crate
-                patterns.push(/extern\s+crate\s+([\w]+)/g);
-            }
-            // Swift
-            else if (lang === 'swift') {
-                // import Framework
-                patterns.push(/import\s+([\w]+)/g);
-            }
-            // Kotlin
-            else if (lang === 'kt') {
-                // import package
-                patterns.push(/import\s+([\w\.]+)/g);
-            }
-            // Java
-            else if (lang === 'java') {
-                // import package
-                patterns.push(/import\s+([\w\.]+);/g);
-            }
-            // Shell
-            else if (lang === 'sh') {
-                // source script.sh
-                patterns.push(/source\s+([\w\/\.]+)/g);
-                patterns(/\.\s+([\w\/\.]+)/g);
+                hardPatterns.push(/import\s*\{[^}]*\}\s*from\s*['"`]([^'"`]+)['"`]/g);
+                hardPatterns.push(/import\s*[\w\s,]+\s*from\s*['"`]([^'"`]+)['"`]/g);
+                hardPatterns.push(/import\s*['"`]([^'"`]+)['"`]/g);
+                hardPatterns.push(/import\(\s*['"`]([^'"`]+)['"`]\s*\)/g);
+                hardPatterns.push(/require\(\s*['"`]([^'"`]+)['"`]\s*\)/g);
+            } else if (lang === 'cs' || lang === 'cpp') {
+                hardPatterns.push(/#include\s*["<]([^">]+)[">]/g);
+                hardPatterns.push(/using\s+([\w\.]+);/g);
+            } else if (lang === 'py') {
+                hardPatterns.push(/import\s+([\w\.]+)/g);
+                hardPatterns.push(/from\s+([\w\.]+)\s+import/g);
+            } else if (lang === 'rb') {
+                hardPatterns.push(/require\s+['"]([^'"]+)['"]/g);
+                hardPatterns.push(/require_relative\s+['"]([^'"]+)['"]/g);
+            } else if (lang === 'php') {
+                hardPatterns.push(/require\s+['"]([^'"]+)['"]/g);
+                hardPatterns.push(/require\s+["]([^"]+)["]/g);
+                hardPatterns.push(/include\s+['"]([^'"]+)['"]/g);
+                hardPatterns.push(/include\s+["]([^"]+)["]/g);
+                hardPatterns.push(/use\s+([\w\\]+)/g);
+            } else if (lang === 'go') {
+                hardPatterns.push(/import\s+["]([^"]+)["]/g);
+                hardPatterns.push(/import\s*\(\s*["]([^"]+)["]/g);
+            } else if (lang === 'rs') {
+                hardPatterns.push(/use\s+([\w:]+)/g);
+                hardPatterns.push(/extern\s+crate\s+([\w]+)/g);
+            } else if (lang === 'swift') {
+                hardPatterns.push(/import\s+([\w]+)/g);
+            } else if (lang === 'kt') {
+                hardPatterns.push(/import\s+([\w\.]+)/g);
+            } else if (lang === 'java') {
+                hardPatterns.push(/import\s+([\w\.]+);/g);
+            } else if (lang === 'sh') {
+                hardPatterns.push(/source\s+([\w\/\.]+)/g);
             }
 
-            // Also always try to match any quoted string that looks like a file path
-            // with slashes or dots, as a fallback for any language
-            patterns.push(/['"`]([^'"`]*\.[a-zA-Z0-9]+)['"`]/g);
+            // --- 2. LOOSE PATTERNS (Structural Plane: Safe architecture configs, e.g., Electron) ---
+            const loosePatterns = [];
+            // HTML assets
+            loosePatterns.push(/(?:src|href)=['"]([^'"]+\.[a-zA-Z0-9]+)['"]/g);
+            // Electron specific & general asset loading
+            loosePatterns.push(/(?:preload|loadURL|loadFile).*?['"`]([^'"`]+)['"`]/g);
+            // Universal fallback for config files (like package.json) capturing random paths
+            loosePatterns.push(/['"`]([^'"`]*\.[a-zA-Z0-9]+)['"`]/g);
 
-            // Execute all patterns
-            patterns.forEach(regex => {
-                // Reset lastIndex because we might reuse the regex
+            // Execute Hard
+            hardPatterns.forEach(regex => {
                 regex.lastIndex = 0;
                 let match;
                 while ((match = regex.exec(content)) !== null) {
-                    if (match[1]) {
-                        const dep = match[1].trim();
-                        // Filter out common false positives (e.g., 'react', 'lodash') — only keep paths with slashes or dots
-                        if (dep.includes('/') || dep.includes('\\') || dep.includes('.')) {
-                            deps.push(dep);
-                        }
-                    }
+                    if (match[1]) addDep(match[1].trim(), false);
                 }
             });
 
-            // Deduplicate
-            return [...new Set(deps)];
+            // Execute Loose (Structural)
+            loosePatterns.forEach(regex => {
+                regex.lastIndex = 0;
+                let match;
+                while ((match = regex.exec(content)) !== null) {
+                    if (match[1]) addDep(match[1].trim(), true);
+                }
+            });
+
+            return Array.from(deps.values());
         }
 
         // ================================================================
@@ -1423,25 +1480,16 @@
 
             // --- Extract dependencies using the enhanced parser ---
             const rawDeps = extractDependencies(content, ext);
-            rawDeps.forEach(depPath => {
-                // Normalize path: replace backslashes, remove leading ./ or ../
-                let norm = depPath.replace(/\\/g, '/');
-                // Remove leading './' or '../' but keep the rest
-                norm = norm.replace(/^\.\.?\//, '');
-                const parts = norm.split('/');
-                const depFile = parts.pop();
-                if (depFile) {
-                    // Check if it's a real file name (has extension)
-                    if (depFile.includes('.')) {
-                        deps.push(depFile);
-                        // Store inferred path for the dependency
-                        if (parts.length > 0) {
-                            const inferredDir = parts.join('/');
-                            if (!state.inferredPaths[depFile] ||
-                                inferredDir.split('/').length > state.inferredPaths[depFile].split('/').length) {
-                                state.inferredPaths[depFile] = inferredDir;
-                            }
-                        }
+            rawDeps.forEach(depObj => {
+                const depFile = depObj.file;
+                deps.push({ target: depFile, isStructural: depObj.isStructural });
+                
+                // Store inferred path for the dependency
+                if (depObj.parts.length > 0) {
+                    const inferredDir = depObj.parts.join('/');
+                    if (!state.inferredPaths[depFile] ||
+                        inferredDir.split('/').length > (state.inferredPaths[depFile]?.split('/').length || 0)) {
+                        state.inferredPaths[depFile] = inferredDir;
                     }
                 }
             });
@@ -1456,14 +1504,14 @@
             }
             if (vars.length === 0) vars = ['Initialization', 'Config Data'];
 
-            // --- Database detection ---
+            // --- Database detection (Databases are structurally safe, not execution loops) ---
             let dbDetected = false;
             const dbRegex1 = /(?:window\.)?indexedDB\.open\(\s*(['"`])([^'"`]+)\1/g;
             let m1;
             while ((m1 = dbRegex1.exec(content)) !== null) {
                 const dbName = m1[2];
                 const dbId = `IndexedDB - ${dbName}`;
-                deps.push(dbId);
+                deps.push({ target: dbId, isStructural: true });
                 if (!state.nodes[dbId]) addNodeData(dbId, 'db', '', [], [], '');
                 dbDetected = true;
             }
@@ -1471,19 +1519,19 @@
             let m2;
             while ((m2 = dbRegex2.exec(content)) !== null) {
                 const lsId = 'LocalStorage';
-                deps.push(lsId);
+                deps.push({ target: lsId, isStructural: true });
                 if (!state.nodes[lsId]) addNodeData(lsId, 'db', '', [], [], '');
             }
             if (!dbDetected && /indexedDB/i.test(content)) {
                 const genericId = 'IndexedDB - Generic';
-                deps.push(genericId);
+                deps.push({ target: genericId, isStructural: true });
                 if (!state.nodes[genericId]) addNodeData(genericId, 'db', '', [], [], '');
             }
 
             if (deps.length === 0 && Object.keys(state.nodes).length > 0) {
                 const keys = Object.keys(state.nodes).filter(k => state.nodes[k].type !== 'db');
                 if (keys.length > 0) {
-                    deps.push(keys[Math.floor(Math.random() * keys.length)]);
+                    deps.push({ target: keys[Math.floor(Math.random() * keys.length)], isStructural: true });
                 }
             }
 
@@ -1515,10 +1563,17 @@
             const nodeEl = createNodeElement(state.nodes[id]);
             el.nodes.appendChild(nodeEl);
 
-            deps.forEach(dep => {
-                const exists = state.edges.some(e => e.source === id && e.target === dep);
-                if (!exists) {
-                    state.edges.push({ source: id, target: dep });
+            deps.forEach(depObj => {
+                // Backward compatibility if array contains strings vs objects
+                const tgt = typeof depObj === 'string' ? depObj : depObj.target;
+                const isStruct = typeof depObj === 'string' ? false : depObj.isStructural;
+
+                if (isStruct) {
+                    const exists = state.structuralEdges.some(e => e.source === id && e.target === tgt);
+                    if (!exists) state.structuralEdges.push({ source: id, target: tgt });
+                } else {
+                    const exists = state.edges.some(e => e.source === id && e.target === tgt);
+                    if (!exists) state.edges.push({ source: id, target: tgt });
                 }
             });
 
@@ -1676,6 +1731,7 @@
             event.stopPropagation();
             delete state.nodes[name];
             state.edges = state.edges.filter(e => e.source !== name && e.target !== name);
+            state.structuralEdges = state.structuralEdges.filter(e => e.source !== name && e.target !== name);
 
             const nodeEl = document.getElementById(`node-${name}`);
             if (nodeEl) nodeEl.remove();
@@ -1695,7 +1751,8 @@
             Object.keys(state.nodes).forEach(id => {
                 const node = state.nodes[id];
                 if (node.type === 'db') {
-                    const hasConnection = state.edges.some(e => e.source === id || e.target === id);
+                    const hasConnection = state.edges.some(e => e.source === id || e.target === id) || 
+                                          state.structuralEdges.some(e => e.source === id || e.target === id);
                     if (!hasConnection) {
                         delete state.nodes[id];
                         const elNode = document.getElementById(`node-${id}`);
@@ -1715,10 +1772,18 @@
         }
 
         function updateEdges() {
-            el.edges.innerHTML = '';
+            const existingPaths = el.edges.querySelectorAll('path');
+            existingPaths.forEach(p => p.remove());
+
             const cRect = el.canvas.getBoundingClientRect();
 
-            state.edges.forEach(edge => {
+            // Combine logic edges and structural edges for rendering
+            const allEdgesToDraw = [
+                ...state.edges.map(e => ({ ...e, isStructural: false })),
+                ...state.structuralEdges.map(e => ({ ...e, isStructural: true }))
+            ];
+
+            allEdgesToDraw.forEach(edge => {
                 const nSrc = state.nodes[edge.source];
                 const nTgt = state.nodes[edge.target];
                 if (!nSrc || !nTgt) return;
@@ -1746,19 +1811,33 @@
 
                 const g = document.createElementNS('http://www.w3.org/2000/svg', 'path');
                 g.setAttribute('d', d);
-                g.setAttribute('class', 'edge-glow');
+                g.setAttribute('class', edge.isStructural ? 'edge-glow structural' : 'edge-glow');
                 el.edges.appendChild(g);
 
                 const b = document.createElementNS('http://www.w3.org/2000/svg', 'path');
                 b.setAttribute('d', d);
-                b.setAttribute('class', 'edge-line');
+                b.setAttribute('class', edge.isStructural ? 'edge-line structural' : 'edge-line');
                 el.edges.appendChild(b);
 
                 const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
                 p.setAttribute('d', d);
-                p.setAttribute('class', 'edge-packet');
+                p.setAttribute('class', edge.isStructural ? 'edge-packet structural' : 'edge-packet');
+                
+                // Only plugin target hard execution logic edges for cyclic tracking
+                if (!edge.isStructural) {
+                    p.setAttribute('data-source', edge.source);
+                    p.setAttribute('data-target', edge.target);
+                    p.setAttribute('marker-end', 'url(#arrowhead)');
+                } else {
+                    // Structural edges still get an arrow, but without the cyclic target data
+                    p.setAttribute('marker-end', 'url(#arrowhead)');
+                }
+                
                 el.edges.appendChild(p);
             });
+
+            // Fire plugin hooks after rendering
+            window.OccamsAPI.hooks.afterEdgesDrawn.forEach(fn => fn(el.edges));
         }
 
         // ================================================================
@@ -1989,6 +2068,7 @@
                 projectName: state.currentProject,
                 nodes: nodesData,
                 edges: state.edges,
+                structuralEdges: state.structuralEdges,
                 inferredPaths: state.inferredPaths,
                 pan: state.pan,
                 zoom: state.zoom,
@@ -1999,6 +2079,7 @@
         function deserializeState(data) {
             state.nodes = {};
             state.edges = [];
+            state.structuralEdges = [];
             state.inferredPaths = {};
             state.filesProcessed = 0;
             state.processedFiles = new Set();
@@ -2013,6 +2094,7 @@
             });
 
             state.edges = data.edges || [];
+            state.structuralEdges = data.structuralEdges || [];
             state.inferredPaths = data.inferredPaths || {};
             state.pan = data.pan || { x: 0, y: 0 };
             state.zoom = data.zoom || 1;
@@ -2120,7 +2202,7 @@
         document.getElementById('confirmClearBtn').addEventListener('click', () => {
             state.currentProject = 'Untitled';
             document.getElementById('currentProjectTag').innerHTML = `<i class="fa-solid fa-diagram-project"></i> Untitled`;
-            state.nodes = {}; state.edges = []; state.inferredPaths = {};
+            state.nodes = {}; state.edges = []; state.structuralEdges = []; state.inferredPaths = {};
             state.filesProcessed = 0; state.processedFiles = new Set();
             el.nodes.innerHTML = ''; el.folders.innerHTML = ''; el.edges.innerHTML = ''; el.fileList.innerHTML = '';
             el.fileCount.innerText = '0';
@@ -2170,6 +2252,7 @@
         // ================================================================
         initDragAndDrop();
         setPickMode('files');
+        loadPlugins(); // Trigger extension loader
 
         (async function init() {
             state.pan.x = 100;
