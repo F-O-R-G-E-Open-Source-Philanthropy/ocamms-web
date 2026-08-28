@@ -1,184 +1,104 @@
 /**
- * Occam's Web Extension: Cloud Database Detector (Full Universal Edition)
+ * Occam's Web Extension: Cloud Database Detector (Robust Edition)
  * 
  * Features:
- * - Detects static AND dynamic imports for ALL supported engines.
- * - Captures database/resource names from engine-specific calls:
- *   - Supabase: .from('table')
- *   - Firebase: .collection('collection')
- *   - MongoDB: .db('database') + .collection('collection')
- *   - Mongoose: .collection('collection') + model('User')
- *   - Prisma: model User { ... }
- *   - DynamoDB: TableName: 'table'
- * - Fallback detection for engines used globally (without imports) via constructor/usage patterns.
- * - Normalizes code to handle multi-line formatting, comments, and quote variations.
- * - Creates distinct `db-cloud` nodes for each unique database + resource.
+ * - Code normalization: strips comments, compresses whitespace, standardizes quotes.
+ * - Configuration‑driven rule set – easily extend for new DB engines or languages.
+ * - Flexible regex patterns that ignore line breaks and quote variations.
+ * - Automatically creates CloudDB nodes with a distinct `db-cloud` type.
  */
 (function() {
     if (!window.OccamsAPI) return;
 
     // ================================================================
-    // 1. CODE PREPROCESSOR
+    // 1. CODE PREPROCESSOR – eliminates structural fragility
     // ================================================================
     function normalizeCodeString(rawCode) {
         return rawCode
+            // Strip multi‑line comments /* ... */
             .replace(/\/\*[\s\S]*?\*\//g, '')
+            // Strip single‑line comments // ...
             .replace(/\/\/.*/g, '')
+            // Strip Python/Ruby/Shell comments (# ...)
             .replace(/#.*/g, '')
+            // Collapse all whitespace (including line breaks) into a single space
             .replace(/\s+/g, ' ')
+            // Standardize on single quotes for easier regex matching
             .replace(/"/g, "'")
             .replace(/`/g, "'");
     }
 
     // ================================================================
-    // 2. IMPORT DETECTOR – static AND dynamic for all engines
+    // 2. CONFIGURATION-DRIVEN RULE SET
     // ================================================================
-    function detectImportedEngines(code) {
-        const engines = {
-            supabase: false,
-            firebase: false,
-            mongodb: false,
-            mongoose: false,
-            prisma: false,
-            dynamodb: false,
-        };
-
-        const testImport = (pattern) => new RegExp(pattern).test(code);
-
-        // Static imports / requires
-        if (testImport(`from\\s+['"]@supabase/supabase-js['"]`) || testImport(`require\\s*\\(['"]@supabase/supabase-js['"]\\)`)) {
-            engines.supabase = true;
-        }
-        if (testImport(`from\\s+['"]firebase['"]`) || testImport(`from\\s+['"]firebase-admin['"]`) || testImport(`require\\s*\\(['"]firebase['"]\\)`)) {
-            engines.firebase = true;
-        }
-        if (testImport(`from\\s+['"]mongodb['"]`) || testImport(`require\\s*\\(['"]mongodb['"]\\)`)) {
-            engines.mongodb = true;
-        }
-        if (testImport(`from\\s+['"]mongoose['"]`) || testImport(`require\\s*\\(['"]mongoose['"]\\)`)) {
-            engines.mongoose = true;
-        }
-        if (testImport(`from\\s+['"]@prisma/client['"]`)) {
-            engines.prisma = true;
-        }
-        if (testImport(`from\\s+['"]@aws-sdk/client-dynamodb['"]`) || testImport(`require\\s*\\(['"]@aws-sdk/client-dynamodb['"]\\)`)) {
-            engines.dynamodb = true;
-        }
-
-        // --- Dynamic imports (universal) ---
-        if (testImport(`import\\s*\\(\\s*'@supabase/supabase-js'`)) engines.supabase = true;
-        if (testImport(`import\\s*\\(\\s*'firebase'`) || testImport(`import\\s*\\(\\s*'firebase-admin'`)) engines.firebase = true;
-        if (testImport(`import\\s*\\(\\s*'mongodb'`)) engines.mongodb = true;
-        if (testImport(`import\\s*\\(\\s*'mongoose'`)) engines.mongoose = true;
-        if (testImport(`import\\s*\\(\\s*'@prisma/client'`)) engines.prisma = true;
-        if (testImport(`import\\s*\\(\\s*'@aws-sdk/client-dynamodb'`)) engines.dynamodb = true;
-
-        return engines;
-    }
+    const RULES = [
+        // Supabase / PostgreSQL / any .from() style
+        { engine: 'Supabase', regex: /\.from\s*\(\s*'([^']+)'\s*\)/g, type: 'Relational Table' },
+        // Firebase / Firestore .collection()
+        { engine: 'Firebase', regex: /\.collection\s*\(\s*'([^']+)'\s*\)/g, type: 'NoSQL Collection' },
+        // MongoDB .collection()
+        { engine: 'MongoDB', regex: /\.collection\s*\(\s*'([^']+)'\s*\)/g, type: 'NoSQL Collection' },
+        // Mongoose model('User')
+        { engine: 'Mongoose', regex: /model\s*\(\s*'([^']+)'/g, type: 'ORM Model' },
+        // Generic SQL keywords (FROM, JOIN, INTO, UPDATE) followed by table name
+        { engine: 'GenericSQL', regex: /(?:from|join|into|update)\s+'?([a-zA-Z0-9_]+)'?/gi, type: 'SQL Table' },
+        // AWS DynamoDB table references (e.g. new DynamoDB.DocumentClient() + .get({ TableName: '...' }))
+        { engine: 'DynamoDB', regex: /TableName\s*:\s*'([^']+)'/g, type: 'NoSQL Table' },
+        // Prisma model (model User { ... }) – used in schema files
+        { engine: 'Prisma', regex: /model\s+([a-zA-Z0-9_]+)\s+{/g, type: 'ORM Model' },
+    ];
 
     // ================================================================
-    // 3. DETECTION LOGIC – with universal fallback for global usage
+    // 3. DETECTION LOGIC
     // ================================================================
     function detectCloudDBs(fileContent, fileName) {
-        const clean = normalizeCodeString(fileContent);
-        const imported = detectImportedEngines(clean);
         const detected = [];
+        const clean = normalizeCodeString(fileContent);
 
-        function addDetections(engineName, regex) {
+        RULES.forEach(({ engine, regex, type }) => {
+            // Reset regex state (global flag requires manual reset)
             regex.lastIndex = 0;
             let match;
             while ((match = regex.exec(clean)) !== null) {
-                const resourceName = match[1] || match[0];
+                const resourceName = match[1] || match[0]; // fallback
                 detected.push({
-                    engine: engineName,
+                    engine,
                     resourceName,
-                    nodeId: `CloudDB - ${engineName} (${resourceName})`
+                    type,
+                    // build a unique node identifier
+                    nodeId: `CloudDB - ${engine} (${resourceName})`
                 });
             }
-        }
-
-        // --- Run rules for imported engines ---
-        if (imported.supabase) {
-            addDetections('Supabase', /\.from\s*\(\s*'([^']+)'\s*\)/g);
-        }
-        if (imported.firebase) {
-            addDetections('Firebase', /\.collection\s*\(\s*'([^']+)'\s*\)/g);
-        }
-        if (imported.mongodb) {
-            addDetections('MongoDB', /\.collection\s*\(\s*'([^']+)'\s*\)/g);
-            addDetections('MongoDB', /\.db\s*\(\s*'([^']+)'\s*\)/g);
-        } else if (imported.mongoose) {
-            addDetections('Mongoose', /\.collection\s*\(\s*'([^']+)'\s*\)/g);
-            addDetections('Mongoose', /model\s*\(\s*'([^']+)'/g);
-        }
-        if (imported.prisma) {
-            addDetections('Prisma', /model\s+([a-zA-Z0-9_]+)\s+{/g);
-        }
-        if (imported.dynamodb) {
-            addDetections('DynamoDB', /TableName\s*:\s*'([^']+)'/g);
-        }
-
-        // --- UNIVERSAL FALLBACK: detect global usage (without imports) ---
-        // We run these only if the engine wasn't imported, to avoid duplication.
-        if (!imported.supabase && /new\s+SupabaseClient/.test(clean)) {
-            // Look for .from('table') calls
-            addDetections('Supabase (global)', /\.from\s*\(\s*'([^']+)'\s*\)/g);
-        }
-        if (!imported.firebase && /new\s+Firebase/.test(clean)) {
-            addDetections('Firebase (global)', /\.collection\s*\(\s*'([^']+)'\s*\)/g);
-        }
-        if (!imported.mongodb && /new\s+MongoClient/.test(clean)) {
-            addDetections('MongoDB (global)', /\.db\s*\(\s*'([^']+)'\s*\)/g);
-            addDetections('MongoDB (global)', /\.collection\s*\(\s*'([^']+)'\s*\)/g);
-        }
-        if (!imported.mongoose && /new\s+Mongoose/.test(clean)) {
-            addDetections('Mongoose (global)', /\.collection\s*\(\s*'([^']+)'\s*\)/g);
-        }
-        if (!imported.prisma && /new\s+PrismaClient/.test(clean)) {
-            addDetections('Prisma (global)', /model\s+([a-zA-Z0-9_]+)\s+{/g);
-        }
-        if (!imported.dynamodb && /new\s+DynamoDB/.test(clean)) {
-            addDetections('DynamoDB (global)', /TableName\s*:\s*'([^']+)'/g);
-        }
-
-        // --- Fallback: Generic SQL – only if no specific DB import was detected ---
-        const anySpecific = Object.values(imported).some(v => v === true);
-        if (!anySpecific) {
-            const genericRegex = /(?:from|join|into|update)\s+'?([a-zA-Z0-9_]+)'?/gi;
-            let match;
-            while ((match = genericRegex.exec(clean)) !== null) {
-                const resourceName = match[1];
-                if (resourceName && resourceName.length > 1) {
-                    detected.push({
-                        engine: 'GenericSQL',
-                        resourceName,
-                        nodeId: `CloudDB - GenericSQL (${resourceName})`
-                    });
-                }
-            }
-        }
+        });
 
         return detected;
     }
 
     // ================================================================
-    // 4. PLUGIN HOOK
+    // 4. PLUGIN HOOK – integrate with Occam's Web file parser
     // ================================================================
     window.OccamsAPI.hooks.onFileParse.push((context) => {
         const { fileName, content, deps } = context;
+
+        // Run detection on the raw content (normalization happens inside)
         const detections = detectCloudDBs(content, fileName);
 
-        detections.forEach(({ engine, resourceName, nodeId }) => {
+        detections.forEach(({ engine, resourceName, type, nodeId }) => {
+            // Add dependency as structural (safe, non‑cyclic)
             deps.push({ target: nodeId, isStructural: true });
+
+            // Create the Cloud DB node if it doesn't exist
             if (!window.OccamsAPI.state.nodes[nodeId]) {
+                // Use type 'db-cloud' – the main UI will render a cloud badge
                 window.OccamsAPI.addNode(nodeId, 'db-cloud', '', [], [], '');
             }
         });
 
+        // Optional: log detection count for debugging
         if (detections.length) {
             console.log(`[CloudDB Detector] ${detections.length} cloud DB references found in ${fileName}`);
         }
     });
 
-    console.log("✅ Occam's Web Extension Loaded: CloudDB Detector (Full Universal Edition)");
+    console.log("✅ Occam's Web Extension Loaded: CloudDB Detector (Robust Edition)");
 })();
