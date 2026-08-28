@@ -1,0 +1,2191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Occam's Web | Premium Dependency Matrix</title>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
+
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+    <style>
+        /* ----- ROOT VARIABLES ----- */
+        :root {
+            --bg-midnight: #0a0a1a;
+            --bg-russian: #020205;
+            --accent-orange: #FF8C00;
+            --accent-orange-glow: rgba(255, 140, 0, 0.4);
+            --text-ruby: #F62217;
+            --text-ruby-glow: rgba(246, 34, 23, 0.6);
+            --text-light: #f0f0f5;
+            --text-muted: #8b8b9e;
+            --glass-bg: rgba(10, 10, 20, 0.65);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8);
+            --font-tech: 'Share Tech Mono', monospace;
+            --font-header: 'Rajdhani', sans-serif;
+        }
+
+        /* ----- RESET ----- */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+
+        /* ----- BODY ----- */
+        body {
+            font-family: var(--font-tech);
+            background: radial-gradient(circle at 50% 0%, #1a1a3a 0%, var(--bg-russian) 100%);
+            color: var(--text-light);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+        }
+
+        /* Scrollbars */
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--accent-orange-glow);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--accent-orange);
+        }
+
+        /* ----- SIDEBAR ----- */
+        #sidebar {
+            width: 380px;
+            background: var(--glass-bg);
+            border-right: 1px solid var(--glass-border);
+            box-shadow: var(--glass-shadow);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            display: flex;
+            flex-direction: column;
+            z-index: 20;
+            position: relative;
+            flex-shrink: 0;
+        }
+
+        .brand {
+            padding: 30px 20px;
+            text-align: center;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, transparent 100%);
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        .brand h1 {
+            font-family: var(--font-header);
+            color: #fff;
+            font-size: 32px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            text-shadow: 0 0 20px var(--text-ruby-glow), 0 0 10px rgba(255, 255, 255, 0.2);
+        }
+        .brand h1 span {
+            color: var(--text-ruby);
+        }
+        .brand p {
+            font-family: var(--font-header);
+            font-size: 14px;
+            color: var(--accent-orange);
+            margin-top: 8px;
+            letter-spacing: 1px;
+            font-weight: 500;
+        }
+
+        /* ----- DROP ZONE ----- */
+        .drop-zone-container {
+            padding: 20px;
+        }
+
+        #drop-zone {
+            border: 2px dashed rgba(255, 140, 0, 0.3);
+            border-radius: 12px;
+            padding: 24px 20px 20px;
+            text-align: center;
+            background: rgba(0, 0, 0, 0.2);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+
+        #drop-zone:hover,
+        #drop-zone.dragover {
+            border-color: var(--accent-orange);
+            background: rgba(255, 140, 0, 0.05);
+            box-shadow: 0 0 20px var(--accent-orange-glow) inset;
+        }
+
+        #drop-zone i.fa-cloud-arrow-up {
+            font-size: 32px;
+            color: var(--accent-orange);
+            margin-bottom: 10px;
+            filter: drop-shadow(0 0 8px var(--accent-orange-glow));
+        }
+
+        #drop-zone p {
+            font-family: var(--font-header);
+            font-size: 16px;
+            color: var(--text-light);
+            pointer-events: none;
+            margin-bottom: 6px;
+        }
+
+        /* ----- MODE TOGGLE ----- */
+        .mode-toggle {
+            display: inline-flex;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            padding: 4px;
+            margin: 6px 0 10px;
+            pointer-events: auto;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .mode-toggle .mode-btn {
+            padding: 6px 18px;
+            font-family: var(--font-header);
+            font-size: 13px;
+            font-weight: 600;
+            border: none;
+            border-radius: 6px;
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.25s ease;
+            letter-spacing: 0.5px;
+        }
+
+        .mode-toggle .mode-btn.active {
+            background: var(--accent-orange);
+            color: #000;
+            box-shadow: 0 0 20px var(--accent-orange-glow);
+        }
+
+        .mode-toggle .mode-btn:not(.active):hover {
+            color: #fff;
+        }
+
+        #drop-zone .browse-links {
+            font-size: 13px;
+            color: var(--text-muted);
+            pointer-events: auto;
+            margin-top: 4px;
+        }
+
+        #drop-zone .browse-links span {
+            color: var(--accent-orange);
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+
+        #drop-zone .browse-links span:hover {
+            color: #fff;
+            text-shadow: 0 0 5px var(--accent-orange-glow);
+        }
+
+        #file-input,
+        #folder-input {
+            display: none;
+        }
+
+        /* ----- FILE TRAY ----- */
+        .file-tray-header {
+            padding: 0 20px 10px;
+            font-family: var(--font-header);
+            font-size: 14px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-bottom: 1px solid var(--glass-border);
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .tray-actions {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .tray-actions .btn-icon {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            padding: 4px 6px;
+            border-radius: 4px;
+        }
+
+        .tray-actions .btn-icon:hover {
+            color: var(--accent-orange);
+            background: rgba(255, 140, 0, 0.1);
+        }
+
+        .tray-actions .btn-icon.danger:hover {
+            color: var(--text-ruby);
+            background: rgba(246, 34, 23, 0.1);
+        }
+
+        #file-list {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 0 10px 20px;
+        }
+
+        .file-item {
+            display: flex;
+            align-items: center;
+            padding: 10px 14px;
+            margin-bottom: 6px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+
+        .file-item:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: var(--accent-orange-glow);
+            transform: translateX(4px);
+        }
+
+        .file-item .doc-icon-wrapper {
+            position: relative;
+            width: 28px;
+            height: 36px;
+            margin-right: 12px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .file-item .doc-icon-bg {
+            position: absolute;
+            font-size: 32px;
+            color: rgba(255, 255, 255, 0.08);
+        }
+
+        .file-item .doc-icon-text {
+            position: absolute;
+            font-family: var(--font-header);
+            font-weight: 700;
+            font-size: 10px;
+            color: var(--accent-orange);
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -40%);
+            text-shadow: 0 0 5px rgba(0, 0, 0, 0.8);
+        }
+
+        .file-item .file-info {
+            flex: 1;
+            overflow: hidden;
+            min-width: 0;
+        }
+
+        .file-item .file-name {
+            font-family: var(--font-header);
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-light);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .file-item .file-meta {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 1px;
+        }
+
+        .path-input {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px dashed rgba(255, 255, 255, 0.15);
+            color: var(--accent-orange);
+            font-family: var(--font-tech);
+            font-size: 10px;
+            width: 75px;
+            padding: 2px 4px;
+            border-radius: 3px;
+            outline: none;
+            transition: all 0.2s ease;
+            margin-left: 4px;
+        }
+
+        .path-input:focus {
+            border-color: var(--accent-orange);
+            background: rgba(0,0,0,0.3);
+            width: 140px;
+        }
+
+        .path-input::placeholder {
+            color: rgba(255, 255, 255, 0.2);
+            font-style: italic;
+        }
+
+        .file-item .file-actions {
+            margin-left: 8px;
+            flex-shrink: 0;
+        }
+
+        .file-item .btn-delete {
+            color: var(--text-muted);
+            background: none;
+            border: none;
+            font-size: 13px;
+            cursor: pointer;
+            padding: 4px;
+            transition: all 0.2s ease;
+        }
+
+        .file-item .btn-delete:hover {
+            color: var(--text-ruby);
+            filter: drop-shadow(0 0 5px var(--text-ruby-glow));
+        }
+
+        /* ----- WORKSPACE ----- */
+        #workspace {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            background-image:
+                linear-gradient(rgba(255, 140, 0, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 140, 0, 0.05) 1px, transparent 1px);
+            background-size: 40px 40px;
+            background-position: 0 0;
+            cursor: grab;
+        }
+
+        #workspace::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at center, transparent 30%, rgba(2, 2, 5, 0.6) 100%);
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        #workspace:active {
+            cursor: grabbing;
+        }
+
+        /* ----- CANVAS ----- */
+        #canvas {
+            position: absolute;
+            inset: 0;
+            transform-origin: 0 0;
+        }
+
+        #folders {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        #edges {
+            position: absolute;
+            inset: 0;
+            overflow: visible;
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        #nodes {
+            position: absolute;
+            inset: 0;
+            z-index: 3;
+        }
+
+        /* ----- FOLDER BOX (AABB) ----- */
+        .folder-box {
+            position: absolute;
+            background: rgba(255, 140, 0, 0.03);
+            border: 1px dashed rgba(255, 140, 0, 0.15);
+            border-radius: 12px;
+            pointer-events: none;
+            transition: left 0.1s ease, top 0.1s ease, width 0.1s ease, height 0.1s ease;
+            box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5), 0 0 15px rgba(255, 140, 0, 0.05);
+            backdrop-filter: blur(2px);
+            -webkit-backdrop-filter: blur(2px);
+        }
+
+        .folder-box .folder-label {
+            position: absolute;
+            top: 6px;
+            left: 10px;
+            font-family: var(--font-header);
+            font-size: 14px;
+            font-weight: 700;
+            color: rgba(255, 140, 0, 0.85);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            text-shadow: 0 2px 5px rgba(0, 0, 0, 0.9);
+            letter-spacing: 1px;
+        }
+
+        .folder-box .folder-label i {
+            color: rgba(255, 140, 0, 0.7);
+        }
+
+        /* ----- NODE ----- */
+        .node {
+            position: absolute;
+            width: 260px;
+            background: linear-gradient(135deg, rgba(20, 20, 35, 0.88) 0%, rgba(10, 10, 20, 0.96) 100%);
+            border: 1px solid var(--glass-border);
+            border-top: 1px solid rgba(255, 255, 255, 0.15);
+            border-left: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(0, 0, 0, 0.5);
+            cursor: pointer;
+            transition: box-shadow 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), border-color 0.3s ease;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+
+        .node:hover {
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.9), 0 0 20px var(--text-ruby-glow);
+            border-color: rgba(246, 34, 23, 0.5);
+            z-index: 100;
+        }
+
+        .node-header {
+            display: flex;
+            align-items: center;
+            padding: 10px 14px;
+            background: rgba(0, 0, 0, 0.3);
+            border-bottom: 1px solid rgba(255, 140, 0, 0.12);
+            border-radius: 12px 12px 0 0;
+            position: relative;
+            overflow: hidden;
+            gap: 8px;
+        }
+
+        /* Node type accent lines */
+        .node[data-type="js"] {
+            border-top-color: #f7df1e;
+        }
+        .node[data-type="ts"] {
+            border-top-color: #3178c6;
+        }
+        .node[data-type="cs"] {
+            border-top-color: #239120;
+        }
+        .node[data-type="cpp"] {
+            border-top-color: #00599C;
+        }
+        .node[data-type="py"] {
+            border-top-color: #3776ab;
+        }
+        .node[data-type="rb"] {
+            border-top-color: #cc342d;
+        }
+        .node[data-type="php"] {
+            border-top-color: #777bb4;
+        }
+        .node[data-type="html"] {
+            border-top-color: #e34f26;
+        }
+        .node[data-type="css"] {
+            border-top-color: #1572B6;
+        }
+
+        /* ----- DB NODE (pure icon) ----- */
+        .node.db-node {
+            width: auto;
+            background: transparent;
+            border: none;
+            box-shadow: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            backdrop-filter: none;
+            -webkit-backdrop-filter: none;
+        }
+        .node.db-node:hover {
+            box-shadow: none;
+        }
+        .node.db-node .db-icon {
+            font-size: 64px;
+            color: var(--accent-orange);
+            filter: drop-shadow(0 0 15px var(--accent-orange-glow));
+            margin-bottom: 6px;
+            transition: all 0.3s ease;
+        }
+        .node.db-node:hover .db-icon {
+            color: #fff;
+            filter: drop-shadow(0 0 20px var(--accent-orange));
+            transform: scale(1.05);
+        }
+        .node.db-node .db-title {
+            font-family: var(--font-header);
+            font-weight: 700;
+            font-size: 13px;
+            color: var(--text-light);
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.9);
+            background: rgba(5, 5, 10, 0.85);
+            padding: 5px 14px;
+            border-radius: 6px;
+            border: 1px solid var(--accent-orange-glow);
+            white-space: nowrap;
+        }
+
+        /* ----- NODE TITLE & FOLDER BADGE ----- */
+        .node-title {
+            font-family: var(--font-header);
+            font-weight: 600;
+            font-size: 15px;
+            color: #fff;
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+            min-width: 0;
+        }
+
+        .node-folder-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-family: var(--font-header);
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--accent-orange);
+            background: rgba(255, 140, 0, 0.12);
+            padding: 2px 8px 2px 6px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 140, 0, 0.15);
+            white-space: nowrap;
+            max-width: 100px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            flex-shrink: 0;
+            cursor: default;
+            transition: all 0.2s ease;
+        }
+
+        .node-folder-badge i {
+            font-size: 10px;
+            color: var(--accent-orange);
+        }
+
+        .node-folder-badge:hover {
+            background: rgba(255, 140, 0, 0.2);
+            border-color: var(--accent-orange);
+        }
+
+        /* Folder color accent strip on node */
+        .node-folder-accent {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            border-radius: 12px 12px 0 0;
+            opacity: 0.6;
+            transition: opacity 0.3s ease;
+        }
+
+        .node:hover .node-folder-accent {
+            opacity: 1;
+        }
+
+        .node-toggle {
+            color: var(--text-muted);
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 22px;
+            height: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.04);
+            flex-shrink: 0;
+        }
+        .node-toggle:hover {
+            color: var(--accent-orange);
+            background: rgba(255, 140, 0, 0.1);
+        }
+        .node.expanded .node-toggle {
+            transform: rotate(180deg);
+        }
+
+        .node-content {
+            display: none;
+            padding: 0;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .node.expanded .node-content {
+            display: block;
+        }
+
+        .variable-list {
+            list-style: none;
+            padding: 8px 14px;
+        }
+        .variable-item {
+            padding: 4px 0;
+            display: flex;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+            font-size: 11px;
+            color: var(--text-light);
+            font-family: var(--font-tech);
+        }
+        .variable-item:last-child {
+            border-bottom: none;
+        }
+        .variable-item i {
+            color: var(--text-ruby);
+            margin-right: 6px;
+            font-size: 9px;
+            opacity: 0.8;
+        }
+
+        /* ----- EDGES (SVG) ----- */
+        .edge-glow {
+            stroke: var(--text-ruby);
+            stroke-width: 8;
+            fill: none;
+            opacity: 0.1;
+            filter: blur(4px);
+        }
+        .edge-line {
+            stroke: rgba(255, 140, 0, 0.25);
+            stroke-width: 1.5;
+            fill: none;
+            transition: stroke 0.3s ease;
+        }
+        .edge-packet {
+            stroke: var(--text-ruby);
+            stroke-width: 2.5;
+            fill: none;
+            stroke-dasharray: 4 20;
+            stroke-linecap: round;
+            animation: data-flow 1s linear infinite;
+            filter: drop-shadow(0 0 4px var(--text-ruby));
+        }
+
+        @keyframes data-flow {
+            from {
+                stroke-dashoffset: 24;
+            }
+            to {
+                stroke-dashoffset: 0;
+            }
+        }
+
+        /* ----- TOASTS ----- */
+        .notification-area {
+            position: absolute;
+            bottom: 30px;
+            right: 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        .toast {
+            background: rgba(20, 20, 30, 0.92);
+            border-left: 3px solid var(--accent-orange);
+            color: var(--text-light);
+            padding: 14px 20px;
+            border-radius: 4px;
+            font-family: var(--font-header);
+            font-size: 14px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5), 0 0 15px rgba(255, 140, 0, 0.1);
+            backdrop-filter: blur(10px);
+            opacity: 0;
+            transform: translateX(50px);
+            transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+        .toast.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        /* ----- MODAL SYSTEM ----- */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(5px);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal {
+            background: linear-gradient(135deg, rgba(20, 20, 35, 0.95) 0%, rgba(10, 10, 20, 0.98) 100%);
+            border: 1px solid var(--glass-border);
+            border-top: 1px solid rgba(255, 140, 0, 0.3);
+            border-radius: 12px;
+            padding: 24px;
+            width: 400px;
+            max-width: 90%;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.9), 0 0 20px rgba(255, 140, 0, 0.1);
+        }
+        .modal h3 {
+            font-family: var(--font-header);
+            color: #fff;
+            margin-bottom: 16px;
+            font-size: 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            padding-bottom: 10px;
+        }
+        .modal p {
+            font-size: 14px;
+            color: var(--text-muted);
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+        .modal-input {
+            width: 100%;
+            background: rgba(0,0,0,0.4);
+            border: 1px solid rgba(255,255,255,0.1);
+            color: var(--text-light);
+            padding: 12px;
+            border-radius: 6px;
+            font-family: var(--font-tech);
+            margin-bottom: 20px;
+            outline: none;
+            transition: border-color 0.3s ease;
+        }
+        .modal-input:focus {
+            border-color: var(--accent-orange);
+            box-shadow: 0 0 10px var(--accent-orange-glow);
+        }
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+        }
+        .project-list {
+            max-height: 200px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+        }
+        .project-list-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background: rgba(255,255,255,0.02);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 6px;
+            margin-bottom: 8px;
+        }
+        .project-list-item:hover {
+            background: rgba(255,255,255,0.05);
+            border-color: var(--accent-orange-glow);
+        }
+        .project-name {
+            color: var(--text-light);
+            font-weight: 600;
+            font-size: 14px;
+        }
+        .project-name i {
+            color: var(--accent-orange);
+            margin-right: 8px;
+        }
+
+        /* ----- RESPONSIVE TWEAKS ----- */
+        @media (max-width: 760px) {
+            #sidebar {
+                width: 280px;
+            }
+            .brand h1 {
+                font-size: 24px;
+            }
+            .node {
+                width: 200px;
+            }
+            .node-title {
+                font-size: 13px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- ===== SIDEBAR ===== -->
+    <aside id="sidebar">
+        <div class="brand">
+            <h1>Occam's <span>Web</span></h1>
+            <p>Premium Dependency Matrix</p>
+        </div>
+
+        <div class="drop-zone-container">
+            <div id="drop-zone">
+                <i class="fa-solid fa-cloud-arrow-up"></i>
+                <p>Drag &amp; Drop Scripts / Folders</p>
+
+                <!-- Mode Toggle: Files | Folders -->
+                <div class="mode-toggle" id="modeToggle">
+                    <button class="mode-btn active" data-mode="files" id="modeFiles">
+                        <i class="fa-regular fa-file"></i> Files
+                    </button>
+                    <button class="mode-btn" data-mode="folders" id="modeFolders">
+                        <i class="fa-regular fa-folder"></i> Folder
+                    </button>
+                </div>
+
+                <div class="browse-links">
+                    <span id="browse-action">Browse</span>
+                </div>
+
+                <!-- hidden inputs -->
+                <input type="file" id="file-input" multiple />
+                <input type="file" id="folder-input" multiple webkitdirectory directory />
+            </div>
+        </div>
+
+        <div class="file-tray-header">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span>Integrated Assets</span>
+                <span id="currentProjectTag" class="node-folder-badge" style="cursor:default;" title="Current Project">
+                    <i class="fa-solid fa-diagram-project"></i> Untitled
+                </span>
+            </div>
+            <div class="tray-actions">
+                <button class="btn-icon" id="saveSessionBtn" title="Save Project">
+                    <i class="fa-regular fa-floppy-disk"></i>
+                </button>
+                <button class="btn-icon" id="loadSessionBtn" title="Load Project">
+                    <i class="fa-regular fa-folder-open"></i>
+                </button>
+                <button class="btn-icon danger" id="clearSessionBtn" title="Clear Workspace">
+                    <i class="fa-regular fa-trash-can"></i>
+                </button>
+                <span id="file-count">0</span>
+            </div>
+        </div>
+
+        <div id="file-list"></div>
+    </aside>
+
+    <!-- ===== WORKSPACE ===== -->
+    <main id="workspace">
+        <div id="canvas">
+            <div id="folders"></div>
+            <svg id="edges"></svg>
+            <div id="nodes"></div>
+        </div>
+        <div class="notification-area" id="notif-area"></div>
+    </main>
+
+    <!-- ===== MODALS ===== -->
+    <div class="modal-overlay" id="saveModal" style="display:none;">
+        <div class="modal">
+            <h3>Save Project</h3>
+            <input type="text" id="saveProjectName" placeholder="Enter Project Name..." class="modal-input" autocomplete="off" />
+            <div class="modal-footer">
+                <button class="mode-btn" onclick="closeModal('saveModal')">Cancel</button>
+                <button class="mode-btn active" id="confirmSaveBtn">Save Project</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="modal-overlay" id="loadModal" style="display:none;">
+        <div class="modal">
+            <h3>Load Project</h3>
+            <div id="projectList" class="project-list"></div>
+            <div class="modal-footer">
+                <button class="mode-btn" onclick="closeModal('loadModal')">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="confirmModal" style="display:none;">
+        <div class="modal">
+            <h3>Clear Workspace</h3>
+            <p>Are you sure you want to clear the current workspace? (Saved projects will not be deleted).</p>
+            <div class="modal-footer">
+                <button class="mode-btn" onclick="closeModal('confirmModal')">Cancel</button>
+                <button class="mode-btn active" id="confirmClearBtn" style="background:var(--text-ruby)">Clear</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ================================================================
+        //  INDEXEDDB HELPERS
+        // ================================================================
+        const DB_NAME = 'OccamsWebSession';
+        const STORE_NAME = 'matrixProjects';
+        const DB_VERSION = 2; // Upgraded for multi-project support
+
+        function openDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, DB_VERSION);
+                request.onupgradeneeded = (e) => {
+                    const db = e.target.result;
+                    if (!db.objectStoreNames.contains(STORE_NAME)) {
+                        db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+                    }
+                };
+                request.onsuccess = (e) => resolve(e.target.result);
+                request.onerror = (e) => reject(e.target.error);
+            });
+        }
+
+        async function saveProject(projectName, data) {
+            try {
+                const db = await openDB();
+                const tx = db.transaction(STORE_NAME, 'readwrite');
+                const store = tx.objectStore(STORE_NAME);
+                store.put({ id: projectName, updatedAt: Date.now(), ...data });
+                await new Promise((resolve, reject) => {
+                    tx.oncomplete = resolve;
+                    tx.onerror = reject;
+                });
+                return true;
+            } catch (err) {
+                console.error('Save error:', err);
+                return false;
+            }
+        }
+
+        async function loadProject(projectName) {
+            try {
+                const db = await openDB();
+                const tx = db.transaction(STORE_NAME, 'readonly');
+                const store = tx.objectStore(STORE_NAME);
+                return await new Promise((resolve, reject) => {
+                    const req = store.get(projectName);
+                    req.onsuccess = () => resolve(req.result);
+                    req.onerror = () => reject(req.error);
+                });
+            } catch (err) {
+                console.error('Load error:', err);
+                return null;
+            }
+        }
+        
+        async function getAllProjects() {
+            try {
+                const db = await openDB();
+                const tx = db.transaction(STORE_NAME, 'readonly');
+                const store = tx.objectStore(STORE_NAME);
+                return await new Promise((resolve, reject) => {
+                    const req = store.getAllKeys();
+                    req.onsuccess = () => resolve(req.result);
+                    req.onerror = () => reject(req.error);
+                });
+            } catch (err) {
+                console.error('Get all error:', err);
+                return [];
+            }
+        }
+
+        async function deleteProjectFromDB(projectName) {
+            try {
+                const db = await openDB();
+                const tx = db.transaction(STORE_NAME, 'readwrite');
+                const store = tx.objectStore(STORE_NAME);
+                store.delete(projectName);
+                await new Promise((resolve, reject) => {
+                    tx.oncomplete = resolve;
+                    tx.onerror = reject;
+                });
+                return true;
+            } catch (err) {
+                console.error('Delete error:', err);
+                return false;
+            }
+        }
+
+        // ================================================================
+        //  STATE
+        // ================================================================
+        const state = {
+            currentProject: 'Untitled',
+            nodes: {},
+            edges: [],
+            inferredPaths: {},
+            pan: { x: 0, y: 0 },
+            zoom: 1,
+            isDraggingCanvas: false,
+            draggedNode: null,
+            lastMouse: { x: 0, y: 0 },
+            filesProcessed: 0,
+            pickMode: 'files',
+            processedFiles: new Set()
+        };
+
+        // ================================================================
+        //  DOM REFS
+        // ================================================================
+        const el = {
+            workspace: document.getElementById('workspace'),
+            canvas: document.getElementById('canvas'),
+            folders: document.getElementById('folders'),
+            edges: document.getElementById('edges'),
+            nodes: document.getElementById('nodes'),
+            dropZone: document.getElementById('drop-zone'),
+            fileInput: document.getElementById('file-input'),
+            folderInput: document.getElementById('folder-input'),
+            browseAction: document.getElementById('browse-action'),
+            modeFiles: document.getElementById('modeFiles'),
+            modeFolders: document.getElementById('modeFolders'),
+            fileList: document.getElementById('file-list'),
+            fileCount: document.getElementById('file-count'),
+            notifArea: document.getElementById('notif-area'),
+            saveSessionBtn: document.getElementById('saveSessionBtn'),
+            loadSessionBtn: document.getElementById('loadSessionBtn'),
+            clearSessionBtn: document.getElementById('clearSessionBtn')
+        };
+
+        // ================================================================
+        //  HELPERS
+        // ================================================================
+        const exts = {
+            js: { text: 'Js', type: 'js' },
+            ts: { text: 'Ts', type: 'ts' },
+            jsx: { text: 'Rx', type: 'js' },
+            tsx: { text: 'Tx', type: 'ts' },
+            cs: { text: '#', type: 'cs' },
+            cpp: { text: '++', type: 'cpp' },
+            c: { text: 'C', type: 'cpp' },
+            h: { text: 'H', type: 'cpp' },
+            hpp: { text: 'Hp', type: 'cpp' },
+            py: { text: 'Py', type: 'py' },
+            rb: { text: 'Rb', type: 'rb' },
+            php: { text: 'Ph', type: 'php' },
+            html: { text: '<>', type: 'html' },
+            htm: { text: '<>', type: 'html' },
+            css: { text: '{}', type: 'css' },
+            scss: { text: 'Sc', type: 'css' },
+            sass: { text: 'Sa', type: 'css' },
+            less: { text: 'Le', type: 'css' },
+            go: { text: 'Go', type: 'go' },
+            rs: { text: 'Rs', type: 'rs' },
+            swift: { text: 'Sw', type: 'swift' },
+            kt: { text: 'Kt', type: 'kt' },
+            java: { text: 'Ja', type: 'java' },
+            sh: { text: 'Sh', type: 'sh' },
+            json: { text: '{}', type: 'json' },
+            xml: { text: 'Xm', type: 'xml' },
+            yaml: { text: 'Ya', type: 'yaml' },
+            yml: { text: 'Ym', type: 'yaml' },
+            md: { text: 'Md', type: 'md' },
+            txt: { text: 'Tt', type: 'txt' }
+        };
+
+        // Extended file extension to language type mapping for parser
+        const langTypes = {
+            js: 'js',
+            ts: 'ts',
+            jsx: 'js',
+            tsx: 'ts',
+            cs: 'cs',
+            cpp: 'cpp',
+            c: 'cpp',
+            h: 'cpp',
+            hpp: 'cpp',
+            py: 'py',
+            rb: 'rb',
+            php: 'php',
+            go: 'go',
+            rs: 'rs',
+            swift: 'swift',
+            kt: 'kt',
+            java: 'java',
+            sh: 'sh'
+        };
+
+        function stringToColor(str) {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                hash = str.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            const h = Math.abs(hash) % 360;
+            return `hsl(${h}, 65%, 55%)`;
+        }
+
+        // ================================================================
+        //  TOAST
+        // ================================================================
+        function showToast(msg) {
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.innerHTML =
+                `<i class="fa-solid fa-circle-info" style="color:var(--accent-orange); margin-right:8px;"></i> ${msg}`;
+            el.notifArea.appendChild(toast);
+            requestAnimationFrame(() => toast.classList.add('show'));
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 400);
+            }, 4000);
+        }
+
+        // ================================================================
+        //  MODE TOGGLE
+        // ================================================================
+        function setPickMode(mode) {
+            state.pickMode = mode;
+            el.modeFiles.classList.toggle('active', mode === 'files');
+            el.modeFolders.classList.toggle('active', mode === 'folders');
+            el.browseAction.textContent = mode === 'files' ? 'Browse Files' : 'Browse Folder';
+        }
+
+        el.modeFiles.addEventListener('click', (e) => {
+            e.stopPropagation();
+            setPickMode('files');
+        });
+        el.modeFolders.addEventListener('click', (e) => {
+            e.stopPropagation();
+            setPickMode('folders');
+        });
+
+        el.browseAction.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (state.pickMode === 'files') {
+                el.fileInput.click();
+            } else {
+                el.folderInput.click();
+            }
+        });
+
+        el.dropZone.addEventListener('click', (e) => {
+            const tag = e.target.tagName;
+            if (tag === 'BUTTON' || tag === 'SPAN' || e.target.closest('.mode-toggle') || e.target.closest(
+                    '.browse-links')) {
+                return;
+            }
+            if (state.pickMode === 'files') {
+                el.fileInput.click();
+            } else {
+                el.folderInput.click();
+            }
+        });
+
+        // ================================================================
+        //  DRAG & DROP
+        // ================================================================
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        function initDragAndDrop() {
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(ev => {
+                el.dropZone.addEventListener(ev, preventDefaults, false);
+                document.body.addEventListener(ev, preventDefaults, false);
+            });
+            ['dragenter', 'dragover'].forEach(ev => {
+                el.dropZone.addEventListener(ev, () => el.dropZone.classList.add('dragover'), false);
+            });
+            ['dragleave', 'drop'].forEach(ev => {
+                el.dropZone.addEventListener(ev, () => el.dropZone.classList.remove('dragover'), false);
+            });
+            el.dropZone.addEventListener('drop', handleDrop, false);
+        }
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            if (dt.items) {
+                for (let i = 0; i < dt.items.length; i++) {
+                    if (dt.items[i].kind === 'file') {
+                        const entry = dt.items[i].webkitGetAsEntry();
+                        if (entry) traverseFileTree(entry);
+                    }
+                }
+            } else {
+                handleFiles(dt.files);
+            }
+        }
+
+        function traverseFileTree(item, path = '') {
+            if (item.isFile) {
+                item.file(file => {
+                    file.customPath = path + file.name;
+                    handleFiles([file]);
+                });
+            } else if (item.isDirectory) {
+                const reader = item.createReader();
+                reader.readEntries(entries => {
+                    for (let i = 0; i < entries.length; i++) {
+                        traverseFileTree(entries[i], path + item.name + '/');
+                    }
+                });
+            }
+        }
+
+        // ================================================================
+        //  FILE INPUT HANDLERS
+        // ================================================================
+        el.fileInput.addEventListener('change', function() {
+            handleFiles(this.files);
+            this.value = '';
+        });
+
+        el.folderInput.addEventListener('change', function() {
+            handleFiles(this.files);
+            this.value = '';
+        });
+
+        // ================================================================
+        //  ENHANCED PARSER — supports many languages and import patterns
+        // ================================================================
+        function extractDependencies(content, fileExt) {
+            const deps = [];
+            const lang = langTypes[fileExt] || 'js';
+
+            // Common patterns: import, require, include, using, from
+            const patterns = [];
+
+            // JavaScript / TypeScript
+            if (lang === 'js' || lang === 'ts') {
+                // import ... from 'path'
+                patterns.push(/import\s*\{[^}]*\}\s*from\s*['"`]([^'"`]+)['"`]/g);
+                patterns.push(/import\s*[\w\s,]+\s*from\s*['"`]([^'"`]+)['"`]/g);
+                patterns.push(/import\s*['"`]([^'"`]+)['"`]/g);
+                // import('path')
+                patterns.push(/import\(\s*['"`]([^'"`]+)['"`]\s*\)/g);
+                // require('path')
+                patterns.push(/require\(\s*['"`]([^'"`]+)['"`]\s*\)/g);
+                // require("path")
+                patterns.push(/require\(\s*["]([^"]+)["]\s*\)/g);
+            }
+            // C# / C++ / C
+            else if (lang === 'cs' || lang === 'cpp') {
+                // #include "path" or #include <path>
+                patterns.push(/#include\s*["<]([^">]+)[">]/g);
+                // using ... ; (C#)
+                patterns.push(/using\s+([\w\.]+);/g);
+            }
+            // Python
+            else if (lang === 'py') {
+                // import module
+                patterns.push(/import\s+([\w\.]+)/g);
+                // from module import ...
+                patterns.push(/from\s+([\w\.]+)\s+import/g);
+            }
+            // Ruby
+            else if (lang === 'rb') {
+                // require 'path'
+                patterns.push(/require\s+['"]([^'"]+)['"]/g);
+                // require_relative 'path'
+                patterns.push(/require_relative\s+['"]([^'"]+)['"]/g);
+            }
+            // PHP
+            else if (lang === 'php') {
+                // require 'path'
+                patterns.push(/require\s+['"]([^'"]+)['"]/g);
+                patterns.push(/require\s+["]([^"]+)["]/g);
+                // include 'path'
+                patterns.push(/include\s+['"]([^'"]+)['"]/g);
+                patterns.push(/include\s+["]([^"]+)["]/g);
+                // use namespace
+                patterns.push(/use\s+([\w\\]+)/g);
+            }
+            // Go
+            else if (lang === 'go') {
+                // import "path"
+                patterns.push(/import\s+["]([^"]+)["]/g);
+                // import (
+                //   "path"
+                // )
+                patterns.push(/import\s*\(\s*["]([^"]+)["]/g);
+            }
+            // Rust
+            else if (lang === 'rs') {
+                // use crate::path
+                patterns.push(/use\s+([\w:]+)/g);
+                // extern crate
+                patterns.push(/extern\s+crate\s+([\w]+)/g);
+            }
+            // Swift
+            else if (lang === 'swift') {
+                // import Framework
+                patterns.push(/import\s+([\w]+)/g);
+            }
+            // Kotlin
+            else if (lang === 'kt') {
+                // import package
+                patterns.push(/import\s+([\w\.]+)/g);
+            }
+            // Java
+            else if (lang === 'java') {
+                // import package
+                patterns.push(/import\s+([\w\.]+);/g);
+            }
+            // Shell
+            else if (lang === 'sh') {
+                // source script.sh
+                patterns.push(/source\s+([\w\/\.]+)/g);
+                patterns(/\.\s+([\w\/\.]+)/g);
+            }
+
+            // Also always try to match any quoted string that looks like a file path
+            // with slashes or dots, as a fallback for any language
+            patterns.push(/['"`]([^'"`]*\.[a-zA-Z0-9]+)['"`]/g);
+
+            // Execute all patterns
+            patterns.forEach(regex => {
+                // Reset lastIndex because we might reuse the regex
+                regex.lastIndex = 0;
+                let match;
+                while ((match = regex.exec(content)) !== null) {
+                    if (match[1]) {
+                        const dep = match[1].trim();
+                        // Filter out common false positives (e.g., 'react', 'lodash') — only keep paths with slashes or dots
+                        if (dep.includes('/') || dep.includes('\\') || dep.includes('.')) {
+                            deps.push(dep);
+                        }
+                    }
+                }
+            });
+
+            // Deduplicate
+            return [...new Set(deps)];
+        }
+
+        // ================================================================
+        //  FILE PROCESSING — UPGRADED PARSER
+        // ================================================================
+        function handleFiles(files) {
+            [...files].forEach(file => {
+                const fileKey = file.name + (file.customPath || file.webkitRelativePath || '');
+                if (state.processedFiles.has(fileKey)) return;
+                state.processedFiles.add(fileKey);
+
+                const extMatch = file.name.match(/\.([^.]+)$/);
+                const ext = extMatch ? extMatch[1].toLowerCase() : 'txt';
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const content = e.target.result;
+                    processFileData(file, ext, content, file.size);
+                };
+                const blob = file.slice(0, 30000);
+                reader.readAsText(blob);
+            });
+        }
+
+        function processFileData(fileObj, ext, content, size) {
+            const fileName = fileObj.name;
+            const physicalPath = fileObj.customPath || fileObj.webkitRelativePath || '';
+
+            if (state.nodes[fileName]) {
+                showToast(`Updated mapping for ${fileName}`);
+                return;
+            }
+
+            const typeInfo = exts[ext] || { text: '?', type: 'txt' };
+            const nodeType = typeInfo.type;
+
+            let vars = [];
+            let deps = [];
+
+            // --- Determine folder path: INFERRED takes priority ---
+            let dirPath = '';
+            if (state.inferredPaths[fileName]) {
+                dirPath = state.inferredPaths[fileName];
+            } else if (physicalPath) {
+                const parts = physicalPath.split('/');
+                parts.pop();
+                dirPath = parts.join('/');
+            }
+
+            // --- Extract dependencies using the enhanced parser ---
+            const rawDeps = extractDependencies(content, ext);
+            rawDeps.forEach(depPath => {
+                // Normalize path: replace backslashes, remove leading ./ or ../
+                let norm = depPath.replace(/\\/g, '/');
+                // Remove leading './' or '../' but keep the rest
+                norm = norm.replace(/^\.\.?\//, '');
+                const parts = norm.split('/');
+                const depFile = parts.pop();
+                if (depFile) {
+                    // Check if it's a real file name (has extension)
+                    if (depFile.includes('.')) {
+                        deps.push(depFile);
+                        // Store inferred path for the dependency
+                        if (parts.length > 0) {
+                            const inferredDir = parts.join('/');
+                            if (!state.inferredPaths[depFile] ||
+                                inferredDir.split('/').length > state.inferredPaths[depFile].split('/').length) {
+                                state.inferredPaths[depFile] = inferredDir;
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Limit deps to 8
+            if (deps.length > 8) deps = deps.slice(0, 8);
+
+            // --- Extract variables (language agnostic) ---
+            const varMatches = content.matchAll(/(?:function|class|const|let|var|public|private|def|fun|fn|func)\s+([a-zA-Z0-9_]+)/g);
+            for (const m of varMatches) {
+                if (vars.length < 8 && m[1].length > 2) vars.push(m[1]);
+            }
+            if (vars.length === 0) vars = ['Initialization', 'Config Data'];
+
+            // --- Database detection ---
+            let dbDetected = false;
+            const dbRegex1 = /(?:window\.)?indexedDB\.open\(\s*(['"`])([^'"`]+)\1/g;
+            let m1;
+            while ((m1 = dbRegex1.exec(content)) !== null) {
+                const dbName = m1[2];
+                const dbId = `IndexedDB - ${dbName}`;
+                deps.push(dbId);
+                if (!state.nodes[dbId]) addNodeData(dbId, 'db', '', [], [], '');
+                dbDetected = true;
+            }
+            const dbRegex2 = /localStorage\.(?:setItem|getItem)\(\s*(['"`])([^'"`]+)\1/g;
+            let m2;
+            while ((m2 = dbRegex2.exec(content)) !== null) {
+                const lsId = 'LocalStorage';
+                deps.push(lsId);
+                if (!state.nodes[lsId]) addNodeData(lsId, 'db', '', [], [], '');
+            }
+            if (!dbDetected && /indexedDB/i.test(content)) {
+                const genericId = 'IndexedDB - Generic';
+                deps.push(genericId);
+                if (!state.nodes[genericId]) addNodeData(genericId, 'db', '', [], [], '');
+            }
+
+            if (deps.length === 0 && Object.keys(state.nodes).length > 0) {
+                const keys = Object.keys(state.nodes).filter(k => state.nodes[k].type !== 'db');
+                if (keys.length > 0) {
+                    deps.push(keys[Math.floor(Math.random() * keys.length)]);
+                }
+            }
+
+            addNodeData(fileName, nodeType, typeInfo.text, vars, deps, dirPath);
+            addFileToTray(fileName, typeInfo.text, size);
+
+            state.filesProcessed++;
+            el.fileCount.innerText = state.filesProcessed;
+            const dirDisplay = dirPath || 'root';
+            showToast(`🔗 ${fileName} → ${dirDisplay} (${deps.length} deps)`);
+        }
+
+        // ================================================================
+        //  NODE GRAPH
+        // ================================================================
+        function addNodeData(id, type, iconText, vars = [], deps = [], dirPath = '') {
+            const count = Object.keys(state.nodes).length;
+            const angle = count * 0.8;
+            const radius = 150 + count * 20;
+
+            const cx = el.workspace.clientWidth / 2 - 130;
+            const cy = el.workspace.clientHeight / 2 - 50;
+
+            const x = (cx - state.pan.x) / state.zoom + Math.cos(angle) * radius;
+            const y = (cy - state.pan.y) / state.zoom + Math.sin(angle) * radius;
+
+            state.nodes[id] = { id, type, iconText, vars, deps, dirPath, x, y, expanded: true };
+
+            const nodeEl = createNodeElement(state.nodes[id]);
+            el.nodes.appendChild(nodeEl);
+
+            deps.forEach(dep => {
+                const exists = state.edges.some(e => e.source === id && e.target === dep);
+                if (!exists) {
+                    state.edges.push({ source: id, target: dep });
+                }
+            });
+
+            requestAnimationFrame(updateAllVisuals);
+        }
+
+        function createNodeElement(n) {
+            const elNode = document.createElement('div');
+            elNode.id = `node-${n.id}`;
+            elNode.style.left = `${n.x}px`;
+            elNode.style.top = `${n.y}px`;
+
+            if (n.type === 'db') {
+                elNode.className = 'node db-node';
+                elNode.setAttribute('data-type', n.type);
+                elNode.onmousedown = (e) => startNodeDrag(e, n.id);
+                elNode.innerHTML = `
+                    <i class="fa-solid fa-database db-icon"></i>
+                    <div class="db-title">${n.id}</div>
+                `;
+                return elNode;
+            }
+
+            elNode.className = 'node expanded';
+            elNode.setAttribute('data-type', n.type);
+
+            const folderColor = n.dirPath ? stringToColor(n.dirPath) : 'transparent';
+
+            let badgeHtml = '';
+            if (n.dirPath) {
+                const shortName = n.dirPath.split('/').pop() || n.dirPath;
+                badgeHtml =
+                    `<span class="node-folder-badge" title="${n.dirPath}"><i class="fa-regular fa-folder"></i> ${shortName}</span>`;
+            } else {
+                badgeHtml =
+                    `<span class="node-folder-badge" style="opacity:0.4;"><i class="fa-regular fa-folder"></i> root</span>`;
+            }
+
+            const varsHtml = [...new Set(n.vars)].map(v =>
+                `<li class="variable-item"><i class="fa-solid fa-caret-right"></i> ${v}</li>`
+            ).join('') || '<li class="variable-item" style="color:var(--text-muted)">No exports</li>';
+
+            elNode.innerHTML = `
+                <div class="node-folder-accent" style="background:${folderColor};"></div>
+                <div class="node-header" onmousedown="startNodeDrag(event, '${n.id}')">
+                    <div class="doc-icon-wrapper" style="margin-right:8px; width:22px; height:28px; flex-shrink:0;">
+                        <i class="fa-regular fa-file doc-icon-bg" style="font-size:22px;"></i>
+                        <span class="doc-icon-text" style="font-size:8px;">${n.iconText}</span>
+                    </div>
+                    <div class="node-title" title="${n.id}">${n.id}</div>
+                    ${badgeHtml}
+                    <div class="node-toggle" onclick="toggleNode('${n.id}', event)">
+                        <i class="fa-solid fa-chevron-down"></i>
+                    </div>
+                </div>
+                <div class="node-content">
+                    <ul class="variable-list">${varsHtml}</ul>
+                </div>
+            `;
+            return elNode;
+        }
+
+        window.toggleNode = function(id, event) {
+            if (event) event.stopPropagation();
+            const node = state.nodes[id];
+            if (!node || node.type === 'db') return;
+            node.expanded = !node.expanded;
+            const elNode = document.getElementById(`node-${id}`);
+            if (elNode) elNode.classList.toggle('expanded', node.expanded);
+            setTimeout(updateAllVisuals, 300);
+        };
+
+        // ================================================================
+        //  TRAY
+        // ================================================================
+        function addFileToTray(name, iconText, size) {
+            const kb = (size / 1024).toFixed(1);
+            const elItem = document.createElement('div');
+            elItem.className = 'file-item';
+            elItem.id = `tray-${name}`;
+            const dirInfo = state.nodes[name]?.dirPath || '';
+            elItem.innerHTML = `
+                <div class="doc-icon-wrapper">
+                    <i class="fa-regular fa-file doc-icon-bg"></i>
+                    <span class="doc-icon-text">${iconText}</span>
+                </div>
+                <div class="file-info">
+                    <div class="file-name" title="${name}">${name}</div>
+                    <div class="file-meta" style="display:flex; align-items:center;">
+                        ${kb} KB • <input type="text" class="path-input" value="${dirInfo}" placeholder="root" title="Edit folder path (e.g. src/newFolder)">
+                    </div>
+                </div>
+                <div class="file-actions">
+                    <button class="btn-delete" title="Remove" onclick="removeScript('${name}', event)">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                </div>
+            `;
+
+            // Handle Path Input changes
+            const pathInput = elItem.querySelector('.path-input');
+            pathInput.onclick = (e) => e.stopPropagation(); // Prevent panning to node
+            pathInput.onkeydown = (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    pathInput.blur();
+                }
+            };
+            pathInput.onblur = (e) => {
+                let newPath = e.target.value.trim();
+                newPath = newPath.replace(/\/+$/, ''); // Strip trailing slashes
+                
+                if (state.nodes[name] && state.nodes[name].dirPath !== newPath) {
+                    state.nodes[name].dirPath = newPath;
+                    
+                    // Update node badge visually immediately
+                    const nodeEl = document.getElementById(`node-${name}`);
+                    if (nodeEl) {
+                        const badge = nodeEl.querySelector('.node-folder-badge');
+                        if (badge) {
+                            if (newPath) {
+                                const shortName = newPath.split('/').pop();
+                                badge.innerHTML = `<i class="fa-regular fa-folder"></i> ${shortName}`;
+                                badge.title = newPath;
+                                badge.style.opacity = '1';
+                            } else {
+                                badge.innerHTML = `<i class="fa-regular fa-folder"></i> root`;
+                                badge.style.opacity = '0.4';
+                            }
+                        }
+                    }
+                    updateAllVisuals();
+                    if(typeof autoSave === 'function') autoSave();
+                    showToast(`Moved ${name} to ${newPath || 'root'}`);
+                }
+            };
+
+            elItem.onclick = () => {
+                const node = state.nodes[name];
+                if (node) {
+                    state.pan.x = -node.x * state.zoom + (el.workspace.clientWidth / 2) - 130;
+                    state.pan.y = -node.y * state.zoom + (el.workspace.clientHeight / 2) - 50;
+                    updateCanvasTransform();
+                    const nEl = document.getElementById(`node-${name}`);
+                    if (nEl) {
+                        nEl.style.boxShadow = '0 0 30px var(--text-ruby)';
+                        setTimeout(() => nEl.style.boxShadow = '', 1000);
+                    }
+                }
+            };
+            el.fileList.prepend(elItem);
+        }
+
+        window.removeScript = function(name, event) {
+            event.stopPropagation();
+            delete state.nodes[name];
+            state.edges = state.edges.filter(e => e.source !== name && e.target !== name);
+
+            const nodeEl = document.getElementById(`node-${name}`);
+            if (nodeEl) nodeEl.remove();
+
+            const trayEl = document.getElementById(`tray-${name}`);
+            if (trayEl) trayEl.remove();
+
+            state.filesProcessed = Math.max(0, state.filesProcessed - 1);
+            el.fileCount.innerText = state.filesProcessed;
+
+            cleanupOrphanedDBs();
+            updateAllVisuals();
+            showToast(`De-referenced ${name} from matrix.`);
+        };
+
+        function cleanupOrphanedDBs() {
+            Object.keys(state.nodes).forEach(id => {
+                const node = state.nodes[id];
+                if (node.type === 'db') {
+                    const hasConnection = state.edges.some(e => e.source === id || e.target === id);
+                    if (!hasConnection) {
+                        delete state.nodes[id];
+                        const elNode = document.getElementById(`node-${id}`);
+                        if (elNode) elNode.remove();
+                        showToast(`Swept orphaned DB: ${id}`);
+                    }
+                }
+            });
+        }
+
+        // ================================================================
+        //  RENDER: EDGES + FOLDERS
+        // ================================================================
+        function updateAllVisuals() {
+            updateEdges();
+            updateFolders();
+        }
+
+        function updateEdges() {
+            el.edges.innerHTML = '';
+            const cRect = el.canvas.getBoundingClientRect();
+
+            state.edges.forEach(edge => {
+                const nSrc = state.nodes[edge.source];
+                const nTgt = state.nodes[edge.target];
+                if (!nSrc || !nTgt) return;
+
+                const elS = document.getElementById(`node-${edge.source}`);
+                const elT = document.getElementById(`node-${edge.target}`);
+                if (!elS || !elT) return;
+
+                const sRect = elS.getBoundingClientRect();
+                const tRect = elT.getBoundingClientRect();
+
+                let sx = (sRect.left - cRect.left + sRect.width / 2) / state.zoom;
+                let sy = (sRect.top - cRect.top + sRect.height / 2) / state.zoom;
+                let tx = (tRect.left - cRect.left + tRect.width / 2) / state.zoom;
+                let ty = (tRect.top - cRect.top + tRect.height / 2) / state.zoom;
+
+                const dist = Math.hypot(tx - sx, ty - sy);
+                const cp = Math.max(dist * 0.4, 50);
+                let d;
+                if (Math.abs(sx - tx) > Math.abs(sy - ty)) {
+                    d = `M ${sx} ${sy} C ${sx + cp} ${sy}, ${tx - cp} ${ty}, ${tx} ${ty}`;
+                } else {
+                    d = `M ${sx} ${sy} C ${sx} ${sy + cp}, ${tx} ${ty - cp}, ${tx} ${ty}`;
+                }
+
+                const g = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                g.setAttribute('d', d);
+                g.setAttribute('class', 'edge-glow');
+                el.edges.appendChild(g);
+
+                const b = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                b.setAttribute('d', d);
+                b.setAttribute('class', 'edge-line');
+                el.edges.appendChild(b);
+
+                const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                p.setAttribute('d', d);
+                p.setAttribute('class', 'edge-packet');
+                el.edges.appendChild(p);
+            });
+        }
+
+        // ================================================================
+        //  FOLDER AABB — WITH 15px GAP AND CHILD-OVER-PARENT Z-INDEX
+        // ================================================================
+        function updateFolders() {
+            // 1. Group nodes by directory path
+            const dirs = {};
+            Object.values(state.nodes).forEach(n => {
+                if (n.dirPath && n.type !== 'db') {
+                    const parts = n.dirPath.split('/');
+                    let current = '';
+                    parts.forEach(part => {
+                        current = current ? `${current}/${part}` : part;
+                        if (!dirs[current]) dirs[current] = [];
+                        dirs[current].push(n.id);
+                    });
+                }
+            });
+
+            const activeDirs = new Set(Object.keys(dirs));
+            Array.from(el.folders.children).forEach(child => {
+                const dirId = child.getAttribute('data-dir');
+                if (!activeDirs.has(dirId)) child.remove();
+            });
+
+            // Compute max depth
+            let maxDepth = 0;
+            Object.keys(dirs).forEach(dir => {
+                const d = dir.split('/').length;
+                if (d > maxDepth) maxDepth = d;
+            });
+
+            const depthMap = {};
+            Object.keys(dirs).forEach(dir => {
+                depthMap[dir] = dir.split('/').length;
+            });
+
+            // Compute bounding boxes
+            const folderBounds = {};
+            Object.keys(dirs).forEach(dir => {
+                let minX = Infinity,
+                    minY = Infinity,
+                    maxX = -Infinity,
+                    maxY = -Infinity;
+                let valid = false;
+
+                dirs[dir].forEach(nodeId => {
+                    const nodeEl = document.getElementById(`node-${nodeId}`);
+                    if (nodeEl) {
+                        const n = state.nodes[nodeId];
+                        const h = nodeEl.offsetHeight || 150;
+                        const w = nodeEl.offsetWidth || 260;
+                        if (n.x < minX) minX = n.x;
+                        if (n.y < minY) minY = n.y;
+                        if (n.x + w > maxX) maxX = n.x + w;
+                        if (n.y + h > maxY) maxY = n.y + h;
+                        valid = true;
+                    }
+                });
+
+                if (valid) {
+                    folderBounds[dir] = { minX, minY, maxX, maxY };
+                }
+            });
+
+            // --- PADDING: BASE = 30px, extra 25px per depth level above current ---
+            const BASE_PAD = 30;
+            const EXTRA_PER_LEVEL = 25;
+
+            const folderPadding = {};
+            Object.keys(dirs).forEach(dir => {
+                const depth = depthMap[dir] || 1;
+                const pad = BASE_PAD + (maxDepth - depth) * EXTRA_PER_LEVEL;
+                folderPadding[dir] = pad;
+            });
+
+            // Enforce parent > child padding (at least 25px difference)
+            let changed = true;
+            let iterations = 0;
+            const MAX_ITER = 20;
+            while (changed && iterations < MAX_ITER) {
+                changed = false;
+                iterations++;
+                Object.keys(dirs).forEach(dir => {
+                    const children = [];
+                    Object.keys(dirs).forEach(other => {
+                        if (other !== dir && other.startsWith(dir + '/')) {
+                            children.push(other);
+                        }
+                    });
+                    if (children.length === 0) return;
+                    let maxChildPad = 0;
+                    children.forEach(child => {
+                        if (folderPadding[child] > maxChildPad) maxChildPad = folderPadding[child];
+                    });
+                    const requiredPad = maxChildPad + 25;
+                    if (folderPadding[dir] < requiredPad) {
+                        folderPadding[dir] = requiredPad;
+                        changed = true;
+                    }
+                });
+            }
+
+            // Render each folder box
+            Object.keys(dirs).forEach(dir => {
+                const bounds = folderBounds[dir];
+                if (!bounds) return;
+
+                const pad = folderPadding[dir] || BASE_PAD;
+                const topPad = pad + 28;
+
+                const safeId = 'folder-' + btoa(dir).replace(/[^a-zA-Z0-9]/g, '');
+                let box = document.getElementById(safeId);
+                if (!box) {
+                    box = document.createElement('div');
+                    box.id = safeId;
+                    box.setAttribute('data-dir', dir);
+                    box.className = 'folder-box';
+                    const folderName = dir.split('/').pop();
+                    box.innerHTML =
+                        `<div class="folder-label"><i class="fa-solid fa-folder"></i> ${folderName}</div>`;
+                    el.folders.appendChild(box);
+                }
+
+                const depth = depthMap[dir] || 1;
+                box.style.left = `${bounds.minX - pad}px`;
+                box.style.top = `${bounds.minY - topPad}px`;
+                box.style.width = `${bounds.maxX - bounds.minX + pad * 2}px`;
+                box.style.height = `${bounds.maxY - bounds.minY + pad + topPad}px`;
+                // Child folders (deeper) render above parents
+                box.style.zIndex = depth + 1;
+            });
+        }
+
+        // ================================================================
+        //  CANVAS TRANSFORM
+        // ================================================================
+        function updateCanvasTransform() {
+            el.canvas.style.transform =
+                `translate(${state.pan.x}px, ${state.pan.y}px) scale(${state.zoom})`;
+            el.workspace.style.backgroundPosition =
+                `${state.pan.x * 0.5}px ${state.pan.y * 0.5}px`;
+        }
+
+        // ================================================================
+        //  INTERACTIONS: PAN, ZOOM, DRAG NODE
+        // ================================================================
+        el.workspace.addEventListener('mousedown', (e) => {
+            if (e.target.closest('.node')) return;
+            state.isDraggingCanvas = true;
+            state.lastMouse = { x: e.clientX, y: e.clientY };
+        });
+
+        window.addEventListener('mouseup', () => {
+            state.isDraggingCanvas = false;
+            state.draggedNode = null;
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            const dx = e.clientX - state.lastMouse.x;
+            const dy = e.clientY - state.lastMouse.y;
+
+            if (state.isDraggingCanvas) {
+                state.pan.x += dx;
+                state.pan.y += dy;
+                updateCanvasTransform();
+            } else if (state.draggedNode) {
+                const id = state.draggedNode;
+                const node = state.nodes[id];
+                if (!node) return;
+                node.x += dx / state.zoom;
+                node.y += dy / state.zoom;
+                const elNode = document.getElementById(`node-${id}`);
+                if (elNode) {
+                    elNode.style.left = `${node.x}px`;
+                    elNode.style.top = `${node.y}px`;
+                }
+                updateAllVisuals();
+            }
+            state.lastMouse = { x: e.clientX, y: e.clientY };
+        });
+
+        el.workspace.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const delta = e.deltaY > 0 ? 0.9 : 1.1;
+            const rect = el.workspace.getBoundingClientRect();
+            const mx = e.clientX - rect.left;
+            const my = e.clientY - rect.top;
+
+            state.pan.x = mx - (mx - state.pan.x) * delta;
+            state.pan.y = my - (my - state.pan.y) * delta;
+            state.zoom *= delta;
+            state.zoom = Math.max(0.15, Math.min(state.zoom, 2.5));
+            updateCanvasTransform();
+        }, { passive: false });
+
+        window.startNodeDrag = function(e, id) {
+            if (e.target.closest('.node-toggle') || e.target.closest('.btn-delete')) return;
+            state.draggedNode = id;
+            state.lastMouse = { x: e.clientX, y: e.clientY };
+            const elNode = document.getElementById(`node-${id}`);
+            if (elNode) el.nodes.appendChild(elNode);
+        };
+
+        window.addEventListener('resize', updateAllVisuals);
+
+        // ================================================================
+        //  INDEXEDDB SESSION MANAGEMENT
+        // ================================================================
+        function serializeState() {
+            const nodesData = {};
+            Object.keys(state.nodes).forEach(key => {
+                const n = state.nodes[key];
+                nodesData[key] = {
+                    id: n.id,
+                    type: n.type,
+                    iconText: n.iconText,
+                    vars: n.vars,
+                    deps: n.deps,
+                    dirPath: n.dirPath,
+                    x: n.x,
+                    y: n.y,
+                    expanded: n.expanded
+                };
+            });
+            return {
+                projectName: state.currentProject,
+                nodes: nodesData,
+                edges: state.edges,
+                inferredPaths: state.inferredPaths,
+                pan: state.pan,
+                zoom: state.zoom,
+                filesProcessed: state.filesProcessed,
+            };
+        }
+
+        function deserializeState(data) {
+            state.nodes = {};
+            state.edges = [];
+            state.inferredPaths = {};
+            state.filesProcessed = 0;
+            state.processedFiles = new Set();
+            state.currentProject = data.projectName || 'Untitled';
+            
+            document.getElementById('currentProjectTag').innerHTML = `<i class="fa-solid fa-diagram-project"></i> ${state.currentProject}`;
+
+            Object.keys(data.nodes).forEach(key => {
+                const n = data.nodes[key];
+                state.nodes[key] = n;
+                state.processedFiles.add(key);
+            });
+
+            state.edges = data.edges || [];
+            state.inferredPaths = data.inferredPaths || {};
+            state.pan = data.pan || { x: 0, y: 0 };
+            state.zoom = data.zoom || 1;
+            state.filesProcessed = data.filesProcessed || 0;
+
+            rebuildUI();
+            updateCanvasTransform();
+            updateAllVisuals();
+            el.fileCount.innerText = state.filesProcessed;
+            showToast(`📂 Project restored (${state.filesProcessed} files)`);
+        }
+
+        function rebuildUI() {
+            el.nodes.innerHTML = '';
+            el.fileList.innerHTML = '';
+            el.folders.innerHTML = '';
+            el.edges.innerHTML = '';
+
+            Object.keys(state.nodes).forEach(key => {
+                const n = state.nodes[key];
+                const nodeEl = createNodeElement(n);
+                el.nodes.appendChild(nodeEl);
+            });
+
+            Object.keys(state.nodes).forEach(key => {
+                const n = state.nodes[key];
+                if (n.type !== 'db') {
+                    const size = 1024;
+                    addFileToTray(n.id, n.iconText || 'Js', size);
+                }
+            });
+
+            updateAllVisuals();
+        }
+        
+        // Modal helpers
+        window.openModal = function(id) {
+            document.getElementById(id).style.display = 'flex';
+        }
+        window.closeModal = function(id) {
+            document.getElementById(id).style.display = 'none';
+        }
+
+        el.saveSessionBtn.addEventListener('click', () => {
+            document.getElementById('saveProjectName').value = state.currentProject === 'Untitled' ? '' : state.currentProject;
+            openModal('saveModal');
+        });
+        
+        document.getElementById('confirmSaveBtn').addEventListener('click', async () => {
+            const name = document.getElementById('saveProjectName').value.trim() || 'Untitled';
+            state.currentProject = name;
+            document.getElementById('currentProjectTag').innerHTML = `<i class="fa-solid fa-diagram-project"></i> ${name}`;
+            
+            const data = serializeState();
+            const success = await saveProject(name, data);
+            if(success) showToast(`💾 Project '${name}' saved`);
+            else showToast(`❌ Failed to save project`);
+            closeModal('saveModal');
+        });
+
+        el.loadSessionBtn.addEventListener('click', async () => {
+            const projects = await getAllProjects();
+            const listEl = document.getElementById('projectList');
+            listEl.innerHTML = '';
+            
+            if(projects.length === 0) {
+                listEl.innerHTML = '<p style="color:var(--text-muted); font-size:13px; text-align:center;">No saved projects found.</p>';
+            } else {
+                projects.forEach(p => {
+                    const div = document.createElement('div');
+                    div.className = 'project-list-item';
+                    div.innerHTML = `
+                        <span class="project-name"><i class="fa-solid fa-folder"></i> ${p}</span>
+                        <div>
+                            <button class="mode-btn active load-btn" style="padding:4px 10px; font-size:11px;">Load</button>
+                            <button class="mode-btn delete-btn" style="padding:4px 10px; font-size:11px; background:rgba(246, 34, 23, 0.2); color:var(--text-ruby);">Delete</button>
+                        </div>
+                    `;
+                    div.querySelector('.load-btn').onclick = async () => {
+                        const data = await loadProject(p);
+                        if(data) {
+                            el.nodes.innerHTML = ''; el.folders.innerHTML = ''; el.edges.innerHTML = ''; el.fileList.innerHTML = '';
+                            deserializeState(data);
+                        }
+                        closeModal('loadModal');
+                    };
+                    div.querySelector('.delete-btn').onclick = async (e) => {
+                        e.stopPropagation();
+                        await deleteProjectFromDB(p);
+                        div.remove();
+                        if(listEl.children.length === 0) {
+                            listEl.innerHTML = '<p style="color:var(--text-muted); font-size:13px; text-align:center;">No saved projects found.</p>';
+                        }
+                    };
+                    listEl.appendChild(div);
+                });
+            }
+            openModal('loadModal');
+        });
+
+        el.clearSessionBtn.addEventListener('click', () => {
+            openModal('confirmModal');
+        });
+        
+        document.getElementById('confirmClearBtn').addEventListener('click', () => {
+            state.currentProject = 'Untitled';
+            document.getElementById('currentProjectTag').innerHTML = `<i class="fa-solid fa-diagram-project"></i> Untitled`;
+            state.nodes = {}; state.edges = []; state.inferredPaths = {};
+            state.filesProcessed = 0; state.processedFiles = new Set();
+            el.nodes.innerHTML = ''; el.folders.innerHTML = ''; el.edges.innerHTML = ''; el.fileList.innerHTML = '';
+            el.fileCount.innerText = '0';
+            updateAllVisuals();
+            showToast('🧹 Workspace cleared');
+            closeModal('confirmModal');
+        });
+
+        // Auto-save
+        let saveTimeout = null;
+
+        function autoSave() {
+            if (saveTimeout) clearTimeout(saveTimeout);
+            saveTimeout = setTimeout(() => {
+                if (state.currentProject === 'Untitled') return; // Only autosave explicitly saved/loaded projects
+                const data = serializeState();
+                saveProject(state.currentProject, data);
+            }, 3000);
+        }
+
+        const origAddNode = addNodeData;
+        addNodeData = function(id, type, iconText, vars, deps, dirPath) {
+            origAddNode(id, type, iconText, vars, deps, dirPath);
+            autoSave();
+        };
+
+        const origRemoveScript = window.removeScript;
+        window.removeScript = function(name, event) {
+            origRemoveScript(name, event);
+            autoSave();
+        };
+
+        const origToggleNode = window.toggleNode;
+        window.toggleNode = function(id, event) {
+            origToggleNode(id, event);
+            autoSave();
+        };
+
+        window.addEventListener('mouseup', () => {
+            if (state.draggedNode) {
+                autoSave();
+            }
+        });
+
+        // ================================================================
+        //  INIT
+        // ================================================================
+        initDragAndDrop();
+        setPickMode('files');
+
+        (async function init() {
+            state.pan.x = 100;
+            state.pan.y = 100;
+            updateCanvasTransform();
+
+            const projects = await getAllProjects();
+            if (projects.length > 0) {
+                showToast(`🗃️ ${projects.length} saved projects available. Click Load to open one.`);
+            } else {
+                showToast('🕸️ Drop scripts or folders to build the matrix.');
+            }
+        })();
+
+        window.__state = state;
+    </script>
+
+</body>
+</html>
